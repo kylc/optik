@@ -3,7 +3,7 @@ use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion};
 use pyo3::prelude::*;
 use rayon::ThreadPoolBuilder;
 
-use crate::{config::SolverConfig, solve, GradientMode, Robot, SolutionMode, SolverResult};
+use crate::{config::SolverConfig, solve, GradientMode, Robot, SolutionMode};
 
 #[pymethods]
 impl SolverConfig {
@@ -50,10 +50,10 @@ fn load_model(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
 
     let base_link = chain
         .find_link(base_link)
-        .expect(&format!("'{}' does not exist!", base_link));
+        .unwrap_or_else(|| panic!("link '{}' does not exist!", base_link));
     let ee_link = chain
         .find_link(ee_link)
-        .expect(&format!("'{}' does not exist!", ee_link));
+        .unwrap_or_else(|| panic!("link '{}' does not exist!", ee_link));
 
     let serial = k::SerialChain::from_end_to_root(ee_link, base_link);
     PyRobot(Robot::new(serial))
@@ -103,7 +103,6 @@ fn optik(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<GradientMode>()?;
     m.add_class::<SolutionMode>()?;
     m.add_class::<SolverConfig>()?;
-    m.add_class::<SolverResult>()?;
     m.add_function(wrap_pyfunction!(set_parallelism, m)?)?;
     m.add_function(wrap_pyfunction!(load_model, m)?)?;
     m.add_function(wrap_pyfunction!(random_pose, m)?)?;

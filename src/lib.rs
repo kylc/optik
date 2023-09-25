@@ -122,7 +122,7 @@ pub fn objective(
     let tfm_error = tfm_target.inverse() * tfm_actual;
 
     if let Some(g) = grad {
-        let grad = robot.ee_error_grad(&tfm_target, &tfm_actual, x, GradientMode::Analytical);
+        let grad = robot.ee_error_grad(tfm_target, &tfm_actual, x, GradientMode::Analytical);
         g.copy_from_slice(grad.as_slice());
     }
 
