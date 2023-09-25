@@ -5,6 +5,14 @@ use rayon::ThreadPoolBuilder;
 
 use crate::{config::SolverConfig, solve, GradientMode, Robot, SolutionMode};
 
+#[pyfunction]
+fn set_parallelism(n: usize) {
+    ThreadPoolBuilder::new()
+        .num_threads(n)
+        .build_global()
+        .unwrap()
+}
+
 #[pymethods]
 impl SolverConfig {
     #[new]
@@ -29,21 +37,8 @@ impl SolverConfig {
 
 #[pyclass]
 #[pyo3(name = "Robot")]
-struct PyRobot(Robot);
+pub struct PyRobot(Robot);
 
-#[pyclass]
-#[pyo3(name = "Isometry3")]
-struct PyIsometry3(Isometry3<f64>);
-
-#[pyfunction]
-fn set_parallelism(n: usize) {
-    ThreadPoolBuilder::new()
-        .num_threads(n)
-        .build_global()
-        .unwrap()
-}
-
-/// Formats the sum of two numbers as string.
 #[pyfunction]
 fn load_model(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
     let chain = k::Chain::<f64>::from_urdf_file(path).unwrap();
@@ -59,44 +54,50 @@ fn load_model(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
     PyRobot(Robot::new(serial))
 }
 
-#[pyfunction]
-fn random_pose(robot: &PyRobot) -> PyIsometry3 {
-    let robot = &robot.0;
-    let q_target = robot.random_configuration(&mut rand::thread_rng());
-    let target_ee_pose = robot.fk(&q_target);
+#[pymethods]
+impl PyRobot {
+    fn joint_limits(&self) -> (Vec<f64>, Vec<f64>) {
+        let robot = &self.0;
 
-    PyIsometry3(target_ee_pose)
-}
-
-#[pyfunction]
-fn parse_pose(v: Vec<Vec<f64>>) -> PyIsometry3 {
-    let mut m = Matrix4::zeros();
-    for i in 0..4 {
-        for j in 0..4 {
-            m[(i, j)] = v[i][j];
-        }
+        (
+            robot.bounds().0.as_slice().to_vec(),
+            robot.bounds().1.as_slice().to_vec(),
+        )
     }
 
-    let t = Translation3::from(m.fixed_slice::<3, 1>(0, 3).into_owned());
-    let r = UnitQuaternion::from_matrix(&m.fixed_slice::<3, 3>(0, 0).into_owned());
+    fn fk(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
+        let robot = &self.0;
+        let ee_pose = robot.fk(&x);
 
-    PyIsometry3(Isometry3::from_parts(t, r))
+        ee_pose
+            .to_matrix()
+            .row_iter()
+            .map(|row| row.iter().copied().collect())
+            .collect()
+    }
+
+    fn ik(
+        &self,
+        config: &SolverConfig,
+        target: Vec<Vec<f64>>,
+        x0: Vec<f64>,
+    ) -> (Option<Vec<f64>>, f64) {
+        let robot = &self.0;
+
+        fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
+            let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
+
+            let t = Translation3::from(m.fixed_slice::<3, 1>(0, 3).into_owned());
+            let r = UnitQuaternion::from_matrix(&m.fixed_slice::<3, 3>(0, 0).into_owned());
+
+            Isometry3::from_parts(t, r)
+        }
+
+        let target = parse_pose(target);
+        solve(robot, config, &target, x0)
+    }
 }
 
-#[pyfunction]
-#[pyo3(name = "solve")]
-fn py_solve(
-    robot: &PyRobot,
-    config: &SolverConfig,
-    target: &PyIsometry3,
-    x0: Vec<f64>,
-) -> (Option<Vec<f64>>, f64) {
-    solve(&robot.0, config, &target.0, x0)
-}
-
-/// A Python module implemented in Rust. The name of this function must match
-/// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-/// import the module.
 #[pymodule]
 fn optik(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyRobot>()?;
@@ -105,8 +106,5 @@ fn optik(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<SolverConfig>()?;
     m.add_function(wrap_pyfunction!(set_parallelism, m)?)?;
     m.add_function(wrap_pyfunction!(load_model, m)?)?;
-    m.add_function(wrap_pyfunction!(random_pose, m)?)?;
-    m.add_function(wrap_pyfunction!(parse_pose, m)?)?;
-    m.add_function(wrap_pyfunction!(py_solve, m)?)?;
     Ok(())
 }
