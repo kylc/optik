@@ -1,0 +1,30 @@
+[package]
+name = "optik"
+authors = ["Kyle Cesare <kcesare@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "optik"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+float-ord = "0.3"
+k = "0.30"
+nalgebra = { version = "0.30", features = [ "rand" ] }
+nlopt = "0.6"
+pyo3 = { version = "0.19", features = ["extension-module", "abi3-py38"] }
+rand = "0.8"
+rand_chacha = "0.3"
+rayon = "1.8"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[profile.release]
+lto = "thin"
