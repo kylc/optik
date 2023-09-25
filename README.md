@@ -3,6 +3,7 @@
 <p>
     <img alt="MIT"    src="https://img.shields.io/badge/license-MIT-blue.svg">
     <img alt="Apache" src="https://img.shields.io/badge/license-Apache-blue.svg">
+    <img alt="CI"     src="https://github.com/kylc/optik/actions/workflows/ci.yaml/badge.svg">
 </p>
 
 TODO
