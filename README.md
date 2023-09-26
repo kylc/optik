@@ -17,3 +17,7 @@ TODO
 1. Download a recent `.whl` from [GitHub Releases](https://github.com/kylc/optik/releases)
 2. Run `pip install optik<...>.whl` (replace `<...>` with the actual filename)
 3. Test it: `python -c 'import optik'`
+
+## Usage
+
+https://github.com/kylc/optik/blob/32abae82ea3121aa89cdfa91eaf6ab9a4c073a00/example.py#L18-L29
