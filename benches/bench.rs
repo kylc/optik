@@ -62,7 +62,7 @@ fn bench_ik(c: &mut Criterion) {
     let tfm_target = robot.fk(&vec![-0.1, -0.2, 0.0, -0.3, 0.2, 1.1]);
 
     c.bench_function("ik", |b| {
-        b.iter(|| solve(&robot, &config, &tfm_target, x0.clone()))
+        b.iter(|| robot.ik(&config, &tfm_target, x0.clone()))
     });
 }
 

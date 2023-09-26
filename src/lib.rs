@@ -56,7 +56,7 @@ impl Robot {
         m
     }
 
-    pub fn bounds(&self) -> (DVector<f64>, DVector<f64>) {
+    pub fn joint_limits(&self) -> (DVector<f64>, DVector<f64>) {
         let unlimited = Range::new(f64::NEG_INFINITY, f64::INFINITY);
 
         let (lb, ub) = self
@@ -70,7 +70,7 @@ impl Robot {
     }
 
     pub fn random_configuration(&self, rng: &mut impl rand::Rng) -> Vec<f64> {
-        let (lb, ub) = self.bounds();
+        let (lb, ub) = self.joint_limits();
         let mut q = vec![0.0; self.serial_chain.dof()];
         for i in 0..6 {
             q[i] = rng.gen_range(lb[i]..=ub[i])
@@ -111,6 +111,84 @@ impl Robot {
             }
         }
     }
+
+    pub fn ik(
+        &self,
+        config: &SolverConfig,
+        tfm_target: &Isometry3<f64>,
+        x0: Vec<f64>,
+    ) -> (Option<Vec<f64>>, f64) {
+        let (lb, ub) = self.joint_limits();
+
+        let max_time = Duration::from_secs_f64(config.max_time);
+        let start_time = Instant::now();
+
+        // TODO: We can probably use the `rayon::ThreadPoolBuilder` to keep a
+        // thread-local Nlopt instance, instead of recreating it for every
+        // iteration.
+
+        const RNG_SEED: u64 = 42;
+        const MAX_ITERATIONS: u64 = 10000;
+
+        let solution_stream = (0..MAX_ITERATIONS)
+            .into_par_iter()
+            .map(|i| {
+                Nlopt::<Box<dyn ObjFn<()>>, ()>::srand_seed(Some(RNG_SEED));
+
+                let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
+                rng.set_stream(i);
+
+                let mut opt = Nlopt::new(
+                    nlopt::Algorithm::Slsqp,
+                    self.serial_chain.dof(),
+                    objective,
+                    nlopt::Target::Minimize,
+                    (*tfm_target, self.clone()),
+                );
+                opt.set_ftol_abs(config.ftol_abs).unwrap();
+                opt.set_xtol_abs1(config.xtol_abs).unwrap();
+                opt.set_lower_bounds(lb.as_slice()).unwrap();
+                opt.set_upper_bounds(ub.as_slice()).unwrap();
+                opt.set_maxtime(config.max_time).unwrap();
+
+                // The first attempt gets the initial seed provided by the caller.
+                // All other attempts start at some random point.
+                let mut x = if i == 0 {
+                    x0.clone()
+                } else {
+                    self.random_configuration(&mut rng)
+                };
+
+                let res = opt.optimize(&mut x);
+
+                if let Ok((_, cost)) = res {
+                    (Some(x), cost)
+                } else {
+                    (None, f64::INFINITY)
+                }
+            })
+            .take_any_while(|_| (Instant::now() - start_time) < max_time);
+
+        // TODO: Don't unwrap: we may not have a soultion at all, in which case
+        // we should return None.
+        // TODO: Hardcoded score conditions below need to be configurable (based
+        // on `ftol`?)
+        match config.solution_mode {
+            SolutionMode::Quality => {
+                // Continue solving until the timeout is reached and take the best of all
+                // solutions.
+                solution_stream
+                    .min_by_key(|&(_, score)| FloatOrd(score))
+                    .unwrap()
+            }
+            SolutionMode::Speed => {
+                // Take the first solution which satisfies the tolerance.
+                solution_stream
+                    .find_any(|&(_, score)| score < config.ftol_abs)
+                    .unwrap()
+            }
+        }
+    }
 }
 
 pub fn objective(
@@ -127,77 +205,4 @@ pub fn objective(
     }
 
     se3::log(tfm_error).norm_squared()
-}
-
-pub fn solve(
-    robot: &Robot,
-    config: &SolverConfig,
-    tfm_target: &Isometry3<f64>,
-    x0: Vec<f64>,
-) -> (Option<Vec<f64>>, f64) {
-    let (lb, ub) = robot.bounds();
-
-    let max_time = Duration::from_secs_f64(config.max_time);
-    let start_time = Instant::now();
-
-    // TODO: We can probably use the `rayon::ThreadPoolBuilder` to keep a
-    // thread-local Nlopt instance, instead of recreating it for every
-    // iteration.
-
-    const RNG_SEED: u64 = 42;
-    const MAX_ITERATIONS: u64 = 1000;
-
-    let solution_stream = (0..MAX_ITERATIONS)
-        .into_par_iter()
-        .map(|i| {
-            Nlopt::<Box<dyn ObjFn<()>>, ()>::srand_seed(Some(RNG_SEED));
-
-            let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
-            rng.set_stream(i);
-
-            let mut opt = Nlopt::new(
-                nlopt::Algorithm::Slsqp,
-                robot.serial_chain.dof(),
-                objective,
-                nlopt::Target::Minimize,
-                (*tfm_target, robot.clone()),
-            );
-            opt.set_xtol_abs1(config.xtol_abs).unwrap();
-            opt.set_lower_bounds(lb.as_slice()).unwrap();
-            opt.set_upper_bounds(ub.as_slice()).unwrap();
-            opt.set_maxtime(config.max_time).unwrap();
-
-            // The first attempt gets the initial seed provided by the caller.
-            // All other attempts start at some random point.
-            let mut x = if i == 0 {
-                x0.clone()
-            } else {
-                robot.random_configuration(&mut rng)
-            };
-
-            let res = opt.optimize(&mut x);
-
-            if let Ok((_, cost)) = res {
-                (Some(x), cost)
-            } else {
-                (None, f64::INFINITY)
-            }
-        })
-        .take_any_while(|_| (Instant::now() - start_time) < max_time);
-
-    match config.solution_mode {
-        SolutionMode::Quality => {
-            // Continue solving until the timeout is reached and take the best of all
-            // solutions.
-            solution_stream
-                .min_by_key(|&(_, score)| FloatOrd(score))
-                .unwrap()
-        }
-        SolutionMode::Speed => {
-            // Take the first solution which satisfies the tolerance.
-            solution_stream
-                .find_any(|&(_, score)| score < 1e-4)
-                .unwrap()
-        }
-    }
 }

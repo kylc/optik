@@ -21,6 +21,7 @@ pub struct SolverConfig {
     pub solution_mode: SolutionMode,
     pub max_time: f64,
     pub xtol_abs: f64,
+    pub ftol_abs: f64,
 }
 
 impl Default for SolverConfig {
@@ -29,7 +30,8 @@ impl Default for SolverConfig {
             gradient_mode: GradientMode::Analytical,
             solution_mode: SolutionMode::Speed,
             max_time: 0.1,
-            xtol_abs: 1e-5,
+            xtol_abs: 1e-10,
+            ftol_abs: 1e-5,
         }
     }
 }

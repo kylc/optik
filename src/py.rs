@@ -1,9 +1,11 @@
+use std::ops::Deref;
+
 use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion};
 
 use pyo3::prelude::*;
 use rayon::ThreadPoolBuilder;
 
-use crate::{config::SolverConfig, solve, GradientMode, Robot, SolutionMode};
+use crate::{config::SolverConfig, GradientMode, Robot, SolutionMode};
 
 #[pyfunction]
 fn set_parallelism(n: usize) {
@@ -19,18 +21,21 @@ impl SolverConfig {
     #[pyo3(signature=(gradient_mode=GradientMode::Analytical,
                       solution_mode=SolutionMode::Speed,
                       max_time=0.1,
-                      xtol_abs=1e-5))]
+                      xtol_abs=1e-10,
+                      ftol_abs=1e-5))]
     fn py_new(
         gradient_mode: GradientMode,
         solution_mode: SolutionMode,
         max_time: f64,
         xtol_abs: f64,
+        ftol_abs: f64,
     ) -> Self {
         SolverConfig {
             gradient_mode,
             solution_mode,
             max_time,
             xtol_abs,
+            ftol_abs,
         }
     }
 }
@@ -38,6 +43,14 @@ impl SolverConfig {
 #[pyclass]
 #[pyo3(name = "Robot")]
 pub struct PyRobot(Robot);
+
+impl Deref for PyRobot {
+    type Target = Robot;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[pyfunction]
 fn load_model(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
@@ -60,15 +73,17 @@ impl PyRobot {
         let robot = &self.0;
 
         (
-            robot.bounds().0.as_slice().to_vec(),
-            robot.bounds().1.as_slice().to_vec(),
+            robot.joint_limits().0.as_slice().to_vec(),
+            robot.joint_limits().1.as_slice().to_vec(),
         )
     }
 
     fn fk(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
         let robot = &self.0;
-        let ee_pose = robot.fk(&x);
 
+        assert_eq!(x.len(), robot.serial_chain.dof());
+
+        let ee_pose = robot.fk(&x);
         ee_pose
             .to_matrix()
             .row_iter()
@@ -84,6 +99,8 @@ impl PyRobot {
     ) -> (Option<Vec<f64>>, f64) {
         let robot = &self.0;
 
+        assert_eq!(x0.len(), robot.serial_chain.dof());
+
         fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
             let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
 
@@ -94,7 +111,7 @@ impl PyRobot {
         }
 
         let target = parse_pose(target);
-        solve(robot, config, &target, x0)
+        robot.ik(config, &target, x0)
     }
 }
 
