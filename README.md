@@ -10,7 +10,7 @@ TODO
 
 ## Benchmark
 
-<img height="400" src="https://user-images.githubusercontent.com/233860/270494909-9346473f-b74a-4d61-b433-0c088ce8d965.png">
+<img height="400" src="https://user-images.githubusercontent.com/233860/270505593-cc08ba0d-416f-4288-b48c-83c5ffb0d6d9.png">
 
 ## Setup
 

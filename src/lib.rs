@@ -1,4 +1,10 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
 
 use float_ord::FloatOrd;
 use k::{joint::Range, SerialChain};
@@ -128,9 +134,9 @@ impl Robot {
         // iteration.
 
         const RNG_SEED: u64 = 42;
-        const MAX_ITERATIONS: u64 = 10000;
 
-        let solution_stream = (0..MAX_ITERATIONS)
+        let should_exit = Arc::new(AtomicBool::new(false));
+        let solution_stream = (0..u64::MAX)
             .into_par_iter()
             .map(|i| {
                 Nlopt::<Box<dyn ObjFn<()>>, ()>::srand_seed(Some(RNG_SEED));
@@ -143,7 +149,7 @@ impl Robot {
                     self.serial_chain.dof(),
                     objective,
                     nlopt::Target::Minimize,
-                    (*tfm_target, self.clone()),
+                    (*tfm_target, self.clone(), Arc::clone(&should_exit)),
                 );
                 opt.set_ftol_abs(config.ftol_abs).unwrap();
                 opt.set_xtol_abs1(config.xtol_abs).unwrap();
@@ -162,6 +168,12 @@ impl Robot {
                 let res = opt.optimize(&mut x);
 
                 if let Ok((_, cost)) = res {
+                    // Short-circuit any other threads before we return for a
+                    // modest performance improvement.
+                    if config.solution_mode == SolutionMode::Speed && cost < config.ftol_abs {
+                        should_exit.store(true, Ordering::SeqCst);
+                    }
+
                     (Some(x), cost)
                 } else {
                     (None, f64::INFINITY)
@@ -194,8 +206,20 @@ impl Robot {
 pub fn objective(
     x: &[f64],
     grad: Option<&mut [f64]>,
-    (tfm_target, robot): &mut (Isometry3<f64>, Robot),
+    (tfm_target, robot, should_exit): &mut (Isometry3<f64>, Robot, Arc<AtomicBool>),
 ) -> f64 {
+    // A poor substitude to calling Nlopt::force_stop, but the usage of that API
+    // is almost impossible. Return an objective and gradient we know will cause
+    // the optimizer to exit immediately -- because it thinks it is done!
+    //
+    // Just make sure we don't actually interpret this as a real solution.
+    if should_exit.load(Ordering::Relaxed) {
+        if let Some(g) = grad {
+            g.fill(0.0)
+        };
+        return 0.0;
+    }
+
     let tfm_actual = robot.fk(x);
     let tfm_error = tfm_target.inverse() * tfm_actual;
 
