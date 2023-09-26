@@ -21,4 +21,4 @@ TODO
 
 ## Usage
 
-https://github.com/kylc/optik/blob/32abae82ea3121aa89cdfa91eaf6ab9a4c073a00/example.py#L18-L29
+https://github.com/kylc/optik/blob/2096fe8cedfb60111b2a3a9707448a9541cdc805/examples/example.py#L21-L29
