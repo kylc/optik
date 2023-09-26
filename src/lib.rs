@@ -144,12 +144,19 @@ impl Robot {
                 let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
                 rng.set_stream(i);
 
+                let args = ObjectiveArgs {
+                    robot: self.clone(),
+                    config: config.clone(),
+                    tfm_target: tfm_target.clone(),
+                    should_exit: Arc::clone(&should_exit),
+                };
+
                 let mut opt = Nlopt::new(
                     nlopt::Algorithm::Slsqp,
                     self.chain.dof(),
                     objective,
                     nlopt::Target::Minimize,
-                    (*tfm_target, self.clone(), Arc::clone(&should_exit)),
+                    args,
                 );
                 opt.set_ftol_abs(config.ftol_abs).unwrap();
                 opt.set_xtol_abs1(config.xtol_abs).unwrap();
@@ -203,28 +210,33 @@ impl Robot {
     }
 }
 
-pub fn objective(
-    x: &[f64],
-    grad: Option<&mut [f64]>,
-    (tfm_target, robot, should_exit): &mut (Isometry3<f64>, Robot, Arc<AtomicBool>),
-) -> f64 {
+pub struct ObjectiveArgs {
+    pub robot: Robot,
+    pub config: SolverConfig,
+    pub tfm_target: Isometry3<f64>,
+    pub should_exit: Arc<AtomicBool>,
+}
+
+pub fn objective(x: &[f64], grad: Option<&mut [f64]>, args: &mut ObjectiveArgs) -> f64 {
     // A poor substitude to calling Nlopt::force_stop, but the usage of that API
     // is almost impossible. Return an objective and gradient we know will cause
     // the optimizer to exit immediately -- because it thinks it is done!
     //
     // Just make sure we don't actually interpret this as a real solution.
-    if should_exit.load(Ordering::Relaxed) {
+    if args.should_exit.load(Ordering::Relaxed) {
         if let Some(g) = grad {
             g.fill(0.0)
         };
         return 0.0;
     }
 
-    let tfm_actual = robot.fk(x);
+    let robot = &args.robot;
+    let tfm_actual = args.robot.fk(x);
+    let tfm_target = args.tfm_target;
     let tfm_error = tfm_target.inverse() * tfm_actual;
 
     if let Some(g) = grad {
-        let grad = robot.ee_error_grad(tfm_target, &tfm_actual, x, GradientMode::Analytical);
+        let grad = robot.ee_error_grad(&tfm_target, &tfm_actual, x, args.config.gradient_mode);
         g.copy_from_slice(grad.as_slice());
     }
 

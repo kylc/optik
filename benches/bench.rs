@@ -1,3 +1,5 @@
+use std::sync::{atomic::AtomicBool, Arc};
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use k::Chain;
 use nalgebra::Isometry3;
@@ -44,12 +46,17 @@ fn bench_objective(c: &mut Criterion) {
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
-    let target_pose = Isometry3::identity();
+    let tfm_target = Isometry3::identity();
     let mut grad = vec![0.0; 6];
-    let mut user_data = (target_pose, robot);
+    let mut args = ObjectiveArgs {
+        robot,
+        config: SolverConfig::default(),
+        tfm_target,
+        should_exit: Arc::new(AtomicBool::new(false)),
+    };
     c.bench_function("objective", |b| {
         b.iter(|| {
-            objective(&q, Some(&mut grad), &mut user_data);
+            objective(&q, Some(&mut grad), &mut args);
         })
     });
 }

@@ -1,14 +1,14 @@
 use pyo3::pyclass;
 
 #[pyclass]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SolutionMode {
     Quality,
     Speed,
 }
 
 #[pyclass]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum GradientMode {
     Analytical,
     Numerical,
