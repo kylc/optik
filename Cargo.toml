@@ -28,3 +28,5 @@ harness = false
 
 [profile.release]
 lto = "thin"
+codegen-units = 1
+opt-level = 3
