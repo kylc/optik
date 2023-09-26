@@ -81,7 +81,7 @@ impl PyRobot {
     fn fk(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
-        assert_eq!(x.len(), robot.serial_chain.dof());
+        assert_eq!(x.len(), robot.chain.dof());
 
         let ee_pose = robot.fk(&x);
         ee_pose
@@ -99,7 +99,7 @@ impl PyRobot {
     ) -> (Option<Vec<f64>>, f64) {
         let robot = &self.0;
 
-        assert_eq!(x0.len(), robot.serial_chain.dof());
+        assert_eq!(x0.len(), robot.chain.dof());
 
         fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
             let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();

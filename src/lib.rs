@@ -23,25 +23,25 @@ use math::*;
 
 #[derive(Clone)]
 pub struct Robot {
-    serial_chain: SerialChain<f64>,
+    chain: SerialChain<f64>,
 }
 
 impl Robot {
-    pub fn new(serial_chain: SerialChain<f64>) -> Self {
-        Self { serial_chain }
+    pub fn new(chain: SerialChain<f64>) -> Self {
+        Self { chain }
     }
 }
 
 impl Robot {
     pub fn fk(&self, q: &[f64]) -> Isometry3<f64> {
-        self.serial_chain.set_joint_positions_unchecked(q);
-        self.serial_chain.end_transform()
+        self.chain.set_joint_positions_unchecked(q);
+        self.chain.end_transform()
     }
 
     pub fn jacobian_local(&self, q: &[f64]) -> DMatrix<f64> {
         let t_n = self.fk(q); // this updates the joint positions
 
-        let mut m = k::jacobian(&self.serial_chain);
+        let mut m = k::jacobian(&self.chain);
 
         // K computes a Jacobian J(q) in Pinocchio's terms as
         // LOCAL_WORLD_ALIGNED.  Because we compute the compute the right
@@ -66,7 +66,7 @@ impl Robot {
         let unlimited = Range::new(f64::NEG_INFINITY, f64::INFINITY);
 
         let (lb, ub) = self
-            .serial_chain
+            .chain
             .iter_joints()
             .map(|j| j.limits.unwrap_or(unlimited))
             .map(|l| (l.min, l.max))
@@ -77,7 +77,7 @@ impl Robot {
 
     pub fn random_configuration(&self, rng: &mut impl rand::Rng) -> Vec<f64> {
         let (lb, ub) = self.joint_limits();
-        let mut q = vec![0.0; self.serial_chain.dof()];
+        let mut q = vec![0.0; self.chain.dof()];
         for i in 0..6 {
             q[i] = rng.gen_range(lb[i]..=ub[i])
         }
@@ -146,7 +146,7 @@ impl Robot {
 
                 let mut opt = Nlopt::new(
                     nlopt::Algorithm::Slsqp,
-                    self.serial_chain.dof(),
+                    self.chain.dof(),
                     objective,
                     nlopt::Target::Minimize,
                     (*tfm_target, self.clone(), Arc::clone(&should_exit)),
