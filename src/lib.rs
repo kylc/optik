@@ -77,12 +77,9 @@ impl Robot {
 
     pub fn random_configuration(&self, rng: &mut impl rand::Rng) -> Vec<f64> {
         let (lb, ub) = self.joint_limits();
-        let mut q = vec![0.0; self.chain.dof()];
-        for i in 0..6 {
-            q[i] = rng.gen_range(lb[i]..=ub[i])
-        }
-
-        q
+        (0..self.chain.dof())
+            .map(|i| rng.gen_range(lb[i]..=ub[i]))
+            .collect()
     }
 
     #[allow(non_snake_case)] // math symbols :)
