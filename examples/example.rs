@@ -5,10 +5,14 @@ use rand::{rngs::StdRng, SeedableRng};
 
 fn main() {
     let urdf_path = std::env::args().nth(1).unwrap();
-    let ee_name = std::env::args().nth(2).unwrap();
+    let base_name = std::env::args().nth(2).unwrap();
+    let ee_name = std::env::args().nth(3).unwrap();
 
     let chain = k::Chain::<f64>::from_urdf_file(urdf_path).unwrap();
-    let serial = k::SerialChain::from_end(chain.find_link(&ee_name).unwrap());
+    let serial = k::SerialChain::from_end_to_root(
+        chain.find_link(&ee_name).unwrap(),
+        chain.find_link(&base_name).unwrap(),
+    );
     let robot = Robot::new(serial);
 
     let config = SolverConfig::default();
