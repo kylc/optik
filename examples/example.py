@@ -14,9 +14,10 @@ import sys
 import numpy as np
 
 import optik
+from optik import Robot, SolverConfig
 
-robot = optik.load_model(*sys.argv[1:4])
-config = optik.SolverConfig(xtol_abs=1e-20)
+robot = Robot.from_urdf_file(*sys.argv[1:4])
+config = SolverConfig(xtol_abs=1e-20)
 
 # Generate a target pose which is known to be valid, but don't tell the
 # optimizer anything about the joint angles we used to get there!

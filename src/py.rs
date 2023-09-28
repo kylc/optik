@@ -52,23 +52,23 @@ impl Deref for PyRobot {
     }
 }
 
-#[pyfunction]
-fn load_model(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
-    let chain = k::Chain::<f64>::from_urdf_file(path).unwrap();
-
-    let base_link = chain
-        .find_link(base_link)
-        .unwrap_or_else(|| panic!("link '{}' does not exist!", base_link));
-    let ee_link = chain
-        .find_link(ee_link)
-        .unwrap_or_else(|| panic!("link '{}' does not exist!", ee_link));
-
-    let serial = k::SerialChain::from_end_to_root(ee_link, base_link);
-    PyRobot(Robot::new(serial))
-}
-
 #[pymethods]
 impl PyRobot {
+    #[staticmethod]
+    fn from_urdf_file(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
+        let chain = k::Chain::<f64>::from_urdf_file(path).unwrap();
+
+        let base_link = chain
+            .find_link(base_link)
+            .unwrap_or_else(|| panic!("link '{}' does not exist!", base_link));
+        let ee_link = chain
+            .find_link(ee_link)
+            .unwrap_or_else(|| panic!("link '{}' does not exist!", ee_link));
+
+        let serial = k::SerialChain::from_end_to_root(ee_link, base_link);
+        PyRobot(Robot::new(serial))
+    }
+
     fn joint_limits(&self) -> (Vec<f64>, Vec<f64>) {
         let robot = &self.0;
 
@@ -122,6 +122,5 @@ fn optik(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<SolutionMode>()?;
     m.add_class::<SolverConfig>()?;
     m.add_function(wrap_pyfunction!(set_parallelism, m)?)?;
-    m.add_function(wrap_pyfunction!(load_model, m)?)?;
     Ok(())
 }
