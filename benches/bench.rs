@@ -3,7 +3,6 @@ use std::sync::{atomic::AtomicBool, Arc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use k::Chain;
 use nalgebra::Isometry3;
-use rand::Rng;
 
 use optik::*;
 
@@ -30,15 +29,34 @@ fn bench_gradient(c: &mut Criterion) {
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
-    let tfm_target = rand::thread_rng().gen();
-    let tfm_actual = robot.fk(&q);
+    let tfm_target = Isometry3::identity();
+    let args = ObjectiveArgs {
+        robot,
+        config: SolverConfig::default(),
+        tfm_target,
+        should_exit: Default::default(),
+    };
 
     c.bench_function("gradient_analytical", |b| {
-        b.iter(|| robot.ee_error_grad(&tfm_target, &tfm_actual, &q, GradientMode::Analytical))
+        let args = ObjectiveArgs {
+            config: SolverConfig {
+                gradient_mode: GradientMode::Analytical,
+                ..args.config
+            },
+            ..args.clone()
+        };
+        b.iter(|| objective_grad(&q, &args))
     });
 
     c.bench_function("gradient_numerical", |b| {
-        b.iter(|| robot.ee_error_grad(&tfm_target, &tfm_actual, &q, GradientMode::Numerical))
+        let args = ObjectiveArgs {
+            config: SolverConfig {
+                gradient_mode: GradientMode::Numerical,
+                ..args.config
+            },
+            ..args.clone()
+        };
+        b.iter(|| objective_grad(&q, &args))
     });
 }
 

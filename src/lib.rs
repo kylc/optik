@@ -82,39 +82,6 @@ impl Robot {
             .collect()
     }
 
-    #[allow(non_snake_case)] // math symbols :)
-    pub fn ee_error_grad(
-        &self,
-        tfm_target: &Isometry3<f64>,
-        tfm_actual: &Isometry3<f64>, // = self.fk(q), saves a recomputation
-        q: &[f64],
-        grad_mode: GradientMode,
-    ) -> DVector<f64> {
-        match grad_mode {
-            GradientMode::Analytical => {
-                let tfm_error = tfm_target.inv_mul(tfm_actual);
-
-                let Jq = self.jacobian_local(q);
-                let Jlogr = se3::right_jacobian(tfm_error);
-                let J = (Jlogr * Jq).transpose(); // Jq' * Jr' = (Jr * Jq)'
-
-                2.0 * J * se3::log(tfm_error)
-            }
-            GradientMode::Numerical => {
-                let mut g = [0.0; 6];
-                approximate_gradient(
-                    q,
-                    |x: &[f64]| {
-                        let tfm_actual = self.fk(x);
-                        se3::log(tfm_target.inverse() * tfm_actual).norm()
-                    },
-                    &mut g,
-                );
-                DVector::from_row_slice(&g)
-            }
-        }
-    }
-
     pub fn ik(
         &self,
         config: &SolverConfig,
@@ -144,7 +111,7 @@ impl Robot {
                 let args = ObjectiveArgs {
                     robot: self.clone(),
                     config: config.clone(),
-                    tfm_target: tfm_target.clone(),
+                    tfm_target: *tfm_target,
                     should_exit: Arc::clone(&should_exit),
                 };
 
@@ -207,6 +174,7 @@ impl Robot {
     }
 }
 
+#[derive(Clone)]
 pub struct ObjectiveArgs {
     pub robot: Robot,
     pub config: SolverConfig,
@@ -227,15 +195,45 @@ pub fn objective(x: &[f64], grad: Option<&mut [f64]>, args: &mut ObjectiveArgs) 
         return 0.0;
     }
 
-    let robot = &args.robot;
     let tfm_actual = args.robot.fk(x);
     let tfm_target = args.tfm_target;
     let tfm_error = tfm_target.inverse() * tfm_actual;
 
     if let Some(g) = grad {
-        let grad = robot.ee_error_grad(&tfm_target, &tfm_actual, x, args.config.gradient_mode);
+        let grad = objective_grad(x, args);
         g.copy_from_slice(grad.as_slice());
     }
 
     se3::log(tfm_error).norm_squared()
+}
+
+#[allow(non_snake_case)] // math symbols :)
+pub fn objective_grad(x: &[f64], args: &ObjectiveArgs) -> DVector<f64> {
+    let robot = &args.robot;
+    let tfm_actual = &args.robot.fk(x);
+    let tfm_target = &args.tfm_target;
+
+    match args.config.gradient_mode {
+        GradientMode::Analytical => {
+            let tfm_error = tfm_target.inv_mul(tfm_actual);
+
+            let Jq = robot.jacobian_local(x);
+            let Jlogr = se3::right_jacobian(tfm_error);
+            let J = (Jlogr * Jq).transpose(); // Jq' * Jr' = (Jr * Jq)'
+
+            2.0 * J * se3::log(tfm_error)
+        }
+        GradientMode::Numerical => {
+            let mut g = [0.0; 6];
+            approximate_gradient(
+                x,
+                |x: &[f64]| {
+                    let tfm_actual = robot.fk(x);
+                    se3::log(tfm_target.inverse() * tfm_actual).norm()
+                },
+                &mut g,
+            );
+            DVector::from_row_slice(&g)
+        }
+    }
 }
