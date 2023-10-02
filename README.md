@@ -40,3 +40,11 @@ Timing is of a single inverse kinematics solve.
 ## Usage
 
 https://github.com/kylc/optik/blob/4ef93d4bbee9571bb9a7869e73dc8d911ed9079e/examples/example.py#L22-L30
+
+## References
+
+P. Beeson and B. Ames, “TRAC-IK: An open-source library for improved solving of generic inverse kinematics,” in 2015 IEEE-RAS 15th International Conference on Humanoid Robots (Humanoids), Seoul, South Korea: IEEE, Nov. 2015, pp. 928–935. doi: 10.1109/HUMANOIDS.2015.7363472.
+
+J. Williams, "Modern Fortran Edition of the SLSQP Optimizer", Version 1.4.1, 4 Jun 2023, https://github.com/jacobwilliams/slsqp
+
+J. Solà, J. Deray, and D. Atchuthan, “A micro Lie theory for state estimation in robotics.” arXiv, Dec. 08, 2021. Accessed: Jul. 24, 2023. [Online]. Available: http://arxiv.org/abs/1812.01537
