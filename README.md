@@ -9,7 +9,7 @@
 
 A fast inverse kinematics solver for arbitrary serial chains, providing Rust and Python programming interfaces.
 
-The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization problem is formulated and minimized using the SLSQP solver built into NLopt [[2]]. However, this work differs in a couple of ways:
+The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization problem is formulated and minimized using an SLSQP solver [[2]]. However, this work differs in a couple of ways:
 
 - The gradient of the objective function is computed analytically. This is an immediate 2x performance improvement over finite difference approaches, because it requires only one evaluation of the forward kinematics as opposed to two (or more).
 - Random restarting of the nonlinear solver is implemented in a work stealing parallel fashion, so that overall solve time is decreased thanks to the improved chance of finding a good seed.
@@ -17,7 +17,7 @@ The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization 
 - A parallel Newton's method solver is **not** included, because the performance of the full nonlinear problem is quite good on its own.
 
 [1]: https://traclabs.com/projects/trac-ik/
-[2]: https://nlopt.readthedocs.io/en/latest/
+[2]: https://github.com/jacobwilliams/slsqp
 
 ## Benchmark
 

@@ -13,7 +13,6 @@ Usage:
 import sys
 import numpy as np
 
-import optik
 from optik import Robot, SolverConfig
 
 robot = Robot.from_urdf_file(*sys.argv[1:4])

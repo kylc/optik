@@ -96,7 +96,7 @@ impl PyRobot {
         config: &SolverConfig,
         target: Vec<Vec<f64>>,
         x0: Vec<f64>,
-    ) -> (Option<Vec<f64>>, f64) {
+    ) -> Option<(Vec<f64>, f64)> {
         let robot = &self.0;
 
         assert_eq!(x0.len(), robot.chain.dof());

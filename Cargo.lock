@@ -136,15 +136,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd7cc57abe963c6d3b9d8be5b06ba7c8957a930305ca90304f24ef040aa6f961"
 
 [[package]]
-name = "cmake"
-version = "0.1.50"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a31c789563b815f77f4250caee12365734369f942439b7defd71e18a48197130"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "criterion"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -340,12 +331,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cdc71e17332e86d2e1d38c1f99edcb6288ee11b815fb1a4b049eaa2114d369b"
 
 [[package]]
-name = "libm"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7012b1bbb0719e1097c47611d3898568c546d597c2e74d66f6087edd5233ff4"
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -404,8 +389,6 @@ dependencies = [
  "num-complex",
  "num-rational",
  "num-traits",
- "rand",
- "rand_distr",
  "simba",
  "typenum",
 ]
@@ -419,15 +402,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "nlopt"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4580ef1b21db9b6a87d9a0abfd11265a55756b5687519a487bce54c24e64fc6e"
-dependencies = [
- "cmake",
 ]
 
 [[package]]
@@ -467,7 +441,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f30b0abd723be7e2ffca1272140fac1a2f084c77ec3e123c192b66af1ee9e6c2"
 dependencies = [
  "autocfg",
- "libm",
 ]
 
 [[package]]
@@ -490,11 +463,12 @@ dependencies = [
  "float-ord",
  "k",
  "nalgebra",
- "nlopt",
  "pyo3",
+ "pyo3-build-config",
  "rand",
  "rand_chacha",
  "rayon",
+ "slsqp-sys",
 ]
 
 [[package]]
@@ -675,16 +649,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_distr"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
-dependencies = [
- "num-traits",
- "rand",
-]
-
-[[package]]
 name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -834,6 +798,10 @@ dependencies = [
  "paste",
  "wide",
 ]
+
+[[package]]
+name = "slsqp-sys"
+version = "1.4.1"
 
 [[package]]
 name = "smallvec"

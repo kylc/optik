@@ -1,0 +1,8 @@
+[package]
+name = "slsqp-sys"
+authors = ["Kyle Cesare <kcesare@gmail.com>"]
+version = "1.4.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]

@@ -12,12 +12,15 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 float-ord = "0.3"
 k = "0.30"
-nalgebra = { version = "0.30", features = [ "rand" ] }
-nlopt = "0.6"
+nalgebra = "0.30"
 pyo3 = { version = "0.19", features = ["extension-module", "abi3-py38"] }
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.8"
+slsqp-sys = { path = "./slsqp-sys" }
+
+[build-dependencies]
+pyo3-build-config = "0.19"
 
 [dev-dependencies]
 criterion = "0.5"
@@ -27,6 +30,6 @@ name = "bench"
 harness = false
 
 [profile.release]
-lto = "thin"
+lto = true
 codegen-units = 1
 opt-level = 3

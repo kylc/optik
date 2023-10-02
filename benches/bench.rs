@@ -1,5 +1,3 @@
-use std::sync::{atomic::AtomicBool, Arc};
-
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use k::Chain;
 use nalgebra::Isometry3;
@@ -29,12 +27,12 @@ fn bench_gradient(c: &mut Criterion) {
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
+    let mut g = vec![0.0; q.len()];
     let tfm_target = Isometry3::identity();
     let args = ObjectiveArgs {
         robot,
         config: SolverConfig::default(),
         tfm_target,
-        should_exit: Default::default(),
     };
 
     c.bench_function("gradient_analytical", |b| {
@@ -45,7 +43,7 @@ fn bench_gradient(c: &mut Criterion) {
             },
             ..args.clone()
         };
-        b.iter(|| objective_grad(&q, &args))
+        b.iter(|| objective_grad(black_box(&q), &mut g, &args))
     });
 
     c.bench_function("gradient_numerical", |b| {
@@ -56,7 +54,7 @@ fn bench_gradient(c: &mut Criterion) {
             },
             ..args.clone()
         };
-        b.iter(|| objective_grad(&q, &args))
+        b.iter(|| objective_grad(black_box(&q), &mut g, &args))
     });
 }
 
@@ -65,18 +63,12 @@ fn bench_objective(c: &mut Criterion) {
 
     let q = robot.random_configuration(&mut rand::thread_rng());
     let tfm_target = Isometry3::identity();
-    let mut grad = vec![0.0; 6];
-    let mut args = ObjectiveArgs {
+    let args = ObjectiveArgs {
         robot,
         config: SolverConfig::default(),
         tfm_target,
-        should_exit: Arc::new(AtomicBool::new(false)),
     };
-    c.bench_function("objective", |b| {
-        b.iter(|| {
-            objective(&q, Some(&mut grad), &mut args);
-        })
-    });
+    c.bench_function("objective", |b| b.iter(|| objective(black_box(&q), &args)));
 }
 
 fn bench_ik(c: &mut Criterion) {
@@ -84,10 +76,10 @@ fn bench_ik(c: &mut Criterion) {
     let config = SolverConfig::default();
 
     let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
-    let tfm_target = robot.fk(&vec![-0.1, -0.2, 0.0, -0.3, 0.2, 1.1]);
+    let tfm_target = robot.fk(&[-0.1, -0.2, 0.0, -0.3, 0.2, 1.1]);
 
     c.bench_function("ik", |b| {
-        b.iter(|| robot.ik(&config, &tfm_target, x0.clone()))
+        b.iter(|| robot.ik(&config, black_box(&tfm_target), x0.clone()))
     });
 }
 

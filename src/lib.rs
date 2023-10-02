@@ -9,10 +9,10 @@ use std::{
 use float_ord::FloatOrd;
 use k::{joint::Range, SerialChain};
 use nalgebra::{DMatrix, DVector, Isometry3};
-use nlopt::{approximate_gradient, Nlopt, ObjFn};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use slsqp_sys::*;
 
 mod config;
 mod math;
@@ -87,24 +87,28 @@ impl Robot {
         config: &SolverConfig,
         tfm_target: &Isometry3<f64>,
         x0: Vec<f64>,
-    ) -> (Option<Vec<f64>>, f64) {
+    ) -> Option<(Vec<f64>, f64)> {
         let (lb, ub) = self.joint_limits();
 
-        let max_time = Duration::from_secs_f64(config.max_time);
+        // Compute the time at which the user-specified timeout will expire. We
+        // will ensure that no solve threads continue iterating beyond this
+        // time.
         let start_time = Instant::now();
+        let end_time = start_time + Duration::from_secs_f64(config.max_time);
 
-        // TODO: We can probably use the `rayon::ThreadPoolBuilder` to keep a
-        // thread-local Nlopt instance, instead of recreating it for every
-        // iteration.
-
+        // Fix a global RNG seed, which is used to compute sub-seeds for each thread.
         const RNG_SEED: u64 = 42;
 
+        // In SolutionMode::Speed, when one thread finds a solution which
+        // satisfies the tolerances, it will immediately tell all of the other
+        // threads to exit.
         let should_exit = Arc::new(AtomicBool::new(false));
+
+        // Build a parallel stream of solutions from which we can choose how to
+        // draw a final result.
         let solution_stream = (0..u64::MAX)
             .into_par_iter()
             .map(|i| {
-                Nlopt::<Box<dyn ObjFn<()>>, ()>::srand_seed(Some(RNG_SEED));
-
                 let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
                 rng.set_stream(i);
 
@@ -112,21 +116,7 @@ impl Robot {
                     robot: self.clone(),
                     config: config.clone(),
                     tfm_target: *tfm_target,
-                    should_exit: Arc::clone(&should_exit),
                 };
-
-                let mut opt = Nlopt::new(
-                    nlopt::Algorithm::Slsqp,
-                    self.chain.dof(),
-                    objective,
-                    nlopt::Target::Minimize,
-                    args,
-                );
-                opt.set_ftol_abs(config.ftol_abs).unwrap();
-                opt.set_xtol_abs1(config.xtol_abs).unwrap();
-                opt.set_lower_bounds(lb.as_slice()).unwrap();
-                opt.set_upper_bounds(ub.as_slice()).unwrap();
-                opt.set_maxtime(config.max_time).unwrap();
 
                 // The first attempt gets the initial seed provided by the caller.
                 // All other attempts start at some random point.
@@ -136,39 +126,52 @@ impl Robot {
                     self.random_configuration(&mut rng)
                 };
 
-                let res = opt.optimize(&mut x);
+                let mut solver = SlsqpSolver::new(x.len());
+                solver.set_ftol(config.ftol_abs);
+                solver.set_dxtol(config.xtol_abs);
+                solver.set_lb(lb.as_slice());
+                solver.set_ub(ub.as_slice());
 
-                if let Ok((_, cost)) = res {
+                // Iterate the soler until any of:
+                // - The solver converges within the tolerance
+                // - Another thread signals that it has converged
+                // - The timeout expires
+                while solver.iterate(
+                    &mut x,
+                    |x| objective(x, &args),
+                    |x, g| objective_grad(x, g, &args),
+                ) == IterationResult::Continue
+                    && !should_exit.load(Ordering::Relaxed)
+                    && Instant::now() < end_time
+                {}
+
+                // TODO: Don't re-evaluate the objective function here. It was
+                // already done in the last iteration of the solver.
+                let f = objective(&x, &args);
+                if f < config.ftol_abs {
                     // Short-circuit any other threads before we return for a
                     // modest performance improvement.
-                    if config.solution_mode == SolutionMode::Speed && cost < config.ftol_abs {
-                        should_exit.store(true, Ordering::SeqCst);
+                    if config.solution_mode == SolutionMode::Speed {
+                        should_exit.store(true, Ordering::Relaxed);
                     }
 
-                    (Some(x), cost)
+                    Some((x, f))
                 } else {
-                    (None, f64::INFINITY)
+                    None
                 }
             })
-            .take_any_while(|_| (Instant::now() - start_time) < max_time);
+            .take_any_while(|_| Instant::now() < end_time)
+            .flatten();
 
-        // TODO: Don't unwrap: we may not have a soultion at all, in which case
-        // we should return None.
-        // TODO: Hardcoded score conditions below need to be configurable (based
-        // on `ftol`?)
         match config.solution_mode {
             SolutionMode::Quality => {
                 // Continue solving until the timeout is reached and take the best of all
                 // solutions.
-                solution_stream
-                    .min_by_key(|&(_, score)| FloatOrd(score))
-                    .unwrap()
+                solution_stream.min_by_key(|&(_, obj)| FloatOrd(obj))
             }
             SolutionMode::Speed => {
                 // Take the first solution which satisfies the tolerance.
-                solution_stream
-                    .find_any(|&(_, score)| score < config.ftol_abs)
-                    .unwrap()
+                solution_stream.find_any(|&(_, obj)| obj < config.ftol_abs)
             }
         }
     }
@@ -179,36 +182,17 @@ pub struct ObjectiveArgs {
     pub robot: Robot,
     pub config: SolverConfig,
     pub tfm_target: Isometry3<f64>,
-    pub should_exit: Arc<AtomicBool>,
 }
 
-pub fn objective(x: &[f64], grad: Option<&mut [f64]>, args: &mut ObjectiveArgs) -> f64 {
-    // A poor substitude to calling Nlopt::force_stop, but the usage of that API
-    // is almost impossible. Return an objective and gradient we know will cause
-    // the optimizer to exit immediately -- because it thinks it is done!
-    //
-    // Just make sure we don't actually interpret this as a real solution.
-    if args.should_exit.load(Ordering::Relaxed) {
-        if let Some(g) = grad {
-            g.fill(0.0)
-        };
-        return 0.0;
-    }
-
+pub fn objective(x: &[f64], args: &ObjectiveArgs) -> f64 {
     let tfm_actual = args.robot.fk(x);
     let tfm_target = args.tfm_target;
     let tfm_error = tfm_target.inverse() * tfm_actual;
 
-    if let Some(g) = grad {
-        let grad = objective_grad(x, args);
-        g.copy_from_slice(grad.as_slice());
-    }
-
     se3::log(tfm_error).norm_squared()
 }
 
-#[allow(non_snake_case)] // math symbols :)
-pub fn objective_grad(x: &[f64], args: &ObjectiveArgs) -> DVector<f64> {
+pub fn objective_grad(x: &[f64], g: &mut [f64], args: &ObjectiveArgs) {
     let robot = &args.robot;
     let tfm_actual = &args.robot.fk(x);
     let tfm_target = &args.tfm_target;
@@ -217,23 +201,26 @@ pub fn objective_grad(x: &[f64], args: &ObjectiveArgs) -> DVector<f64> {
         GradientMode::Analytical => {
             let tfm_error = tfm_target.inv_mul(tfm_actual);
 
-            let Jq = robot.jacobian_local(x);
-            let Jlogr = se3::right_jacobian(tfm_error);
-            let J = (Jlogr * Jq).transpose(); // Jq' * Jr' = (Jr * Jq)'
+            let j_q = robot.jacobian_local(x);
+            let j_log_se3_r = se3::right_jacobian(tfm_error);
+            let j = (j_log_se3_r * j_q).transpose(); // Jq' * Jr' = (Jr * Jq)'
 
-            2.0 * J * se3::log(tfm_error)
+            let q = 2.0 * j * se3::log(tfm_error);
+            g.copy_from_slice(q.as_slice());
         }
         GradientMode::Numerical => {
-            let mut g = [0.0; 6];
-            approximate_gradient(
-                x,
-                |x: &[f64]| {
-                    let tfm_actual = robot.fk(x);
-                    se3::log(tfm_target.inverse() * tfm_actual).norm()
-                },
-                &mut g,
-            );
-            DVector::from_row_slice(&g)
+            let n = x.len();
+            let mut x0 = x.to_vec();
+            let eps = f64::EPSILON.powf(1.0 / 3.0);
+            for i in 0..n {
+                let x0i = x0[i];
+                x0[i] = x0i - eps;
+                let fl = objective(&x0, args);
+                x0[i] = x0i + eps;
+                let fh = objective(&x0, args);
+                g[i] = (fh - fl) / (2.0 * eps);
+                x0[i] = x0i;
+            }
         }
     }
 }

@@ -18,15 +18,21 @@ fn main() {
     let config = SolverConfig::default();
 
     let mut rng = StdRng::seed_from_u64(42);
-    for _ in 0..10000 {
+    let n = 10000;
+    let mut t_tot = 0;
+    for _ in 0..n {
         let q_target = robot.random_configuration(&mut rng);
         let target_ee_pose = robot.fk(&q_target);
 
         let t0 = Instant::now();
         let x0 = robot.random_configuration(&mut rng);
-        let (_, c) = robot.ik(&config, &target_ee_pose, x0);
-        let tf = Instant::now();
+        if let Some((_, c)) = robot.ik(&config, &target_ee_pose, x0) {
+            let tf = Instant::now();
+            t_tot += (tf - t0).as_micros();
 
-        println!("Total time: {:4.}us (to: {:.1e})", (tf - t0).as_micros(), c,);
+            println!("Total time: {:4.}us (to: {:.1e})", (tf - t0).as_micros(), c,);
+        }
     }
+
+    println!("Average time: {:.0}us", t_tot as f64 / n as f64);
 }

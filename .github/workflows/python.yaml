@@ -11,22 +11,25 @@ jobs:
       matrix:
         target: [x86_64, i686]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: 3.9
-        architecture: x64
-    - name: Build wheels
-      uses: PyO3/maturin-action@v1
-      with:
-        target: ${{ matrix.target }}
-        manylinux: auto
-        args: --release --out dist
-    - name: Upload wheels
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          architecture: x64
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: --release --out dist
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
 
   pre-release:
     name: Pre Release
