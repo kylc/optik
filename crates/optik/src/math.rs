@@ -12,6 +12,7 @@ const _1_15: f64 = 1.0 / 15.0;
 const _1_24: f64 = 1.0 / 24.0;
 const _1_48: f64 = 1.0 / 48.0;
 const _1_120: f64 = 1.0 / 120.0;
+const _1_720: f64 = 1.0 / 720.0;
 
 pub mod so3 {
     use super::*;
@@ -23,7 +24,7 @@ pub mod so3 {
         Matrix3::new(
             0.0,  -w.z,   w.y,
             w.z,   0.0,  -w.x,
-            -w.y,   w.x,   0.0,
+            -w.y,  w.x,   0.0,
         )
     }
 
@@ -38,23 +39,23 @@ pub mod so3 {
         let w23 = w.y * w.z;
         let w33 = w.z * w.z;
         Matrix3::new(
-            -w22 - w33,     w12,           w13,
-            w12,          -w11 - w33,     w23,
-            w13,           w23,          -w11 - w22,
+            -w22 - w33,   w12,         w13,
+             w12,        -w11 - w33,   w23,
+             w13,         w23,        -w11 - w22,
         )
     }
 
     pub fn right_jacobian(omega: Vector3<f64>) -> Matrix3<f64> {
         let theta_sq = omega.norm_squared();
-        let W = hat(omega);
+        let omega_hat = hat(omega);
         let (alpha, diag_value) = if theta_sq < EPSILON {
-            let alpha = (1. / 12.) + theta_sq / 720.;
-            let diag_value = 0.5 * (2. - theta_sq / 6.);
+            let alpha = _1_12 + theta_sq * _1_720;
+            let diag_value = 0.5 * (2. - theta_sq * _1_6);
+
             (alpha, diag_value)
         } else {
             let theta = theta_sq.sqrt();
-            let st = theta.sin();
-            let ct = theta.cos();
+            let (st, ct) = theta.sin_cos();
             let st_1mct = st / (1. - ct);
 
             let alpha = 1. / theta_sq - st_1mct / (2. * theta);
@@ -63,7 +64,9 @@ pub mod so3 {
             (alpha, diag_value)
         };
 
-        alpha * omega * omega.transpose() + Matrix3::from_diagonal_element(diag_value) + 0.5 * W
+        alpha * omega * omega.transpose()
+            + Matrix3::from_diagonal_element(diag_value)
+            + 0.5 * omega_hat
     }
 }
 
@@ -119,8 +122,7 @@ pub mod se3 {
         } else {
             let tinv = 1. / t;
             let t2inv = tinv * tinv;
-            let st = t.sin();
-            let ct = t.cos();
+            let (st, ct) = t.sin_cos();
             let inv_2_2ct = 1. / (2. * (1. - ct));
 
             let beta = t2inv - st * tinv * inv_2_2ct;
@@ -130,12 +132,12 @@ pub mod se3 {
         };
 
         let p = iso.translation.vector;
-        let wTp = w.dot(&p);
-        let v3_tmp = (beta_dot_over_theta * wTp) * w - (t2 * beta_dot_over_theta + 2. * beta) * p;
+        let w_p = w.dot(&p);
+        let v3_tmp = (beta_dot_over_theta * w_p) * w - (t2 * beta_dot_over_theta + 2. * beta) * p;
 
         let C = v3_tmp * w.transpose()
             + beta * w * p.transpose()
-            + wTp * beta * Matrix3::identity()
+            + w_p * beta * Matrix3::identity()
             + so3::hat(0.5 * p);
         C * so3::right_jacobian(w)
     }

@@ -250,11 +250,16 @@ pub fn objective_grad(x: &[f64], g: &mut [f64], args: &ObjectiveArgs) {
             let tfm_error = tfm_target.inv_mul(tfm_actual);
 
             let j_q = robot.jacobian_local(x);
-            let j_log_se3_r = se3::right_jacobian(tfm_error);
-            let j = (j_log_se3_r * j_q).transpose(); // Jq' * Jr' = (Jr * Jq)'
+            let j_log = se3::right_jacobian(tfm_error);
 
-            let q = 2.0 * j * se3::log(tfm_error);
-            g.copy_from_slice(q.as_slice());
+            // Compose the Jacobians to form a linear approximation of the
+            // mapping between joint angles and error in the Lie group of SE(3).
+            // The chain rule says:
+            // J^Z_X = J^Z_Y * J^Y_X
+            let j_log_q = j_log * j_q;
+
+            let grad = 2.0 * j_log_q.transpose() * se3::log(tfm_error);
+            g.copy_from_slice(grad.as_slice());
         }
         GradientMode::Numerical => {
             let n = x.len();
