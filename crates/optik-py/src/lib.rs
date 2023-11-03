@@ -1,42 +1,56 @@
 use std::ops::Deref;
 
+use optik::{GradientMode, Robot, SolutionMode, SolverConfig};
+
 use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion};
-
 use pyo3::prelude::*;
-use rayon::ThreadPoolBuilder;
-
-use crate::{config::SolverConfig, GradientMode, Robot, SolutionMode};
 
 #[pyfunction]
 fn set_parallelism(n: usize) {
-    ThreadPoolBuilder::new()
-        .num_threads(n)
-        .build_global()
-        .unwrap()
+    optik::set_parallelism(n)
 }
 
+#[pyclass]
+#[pyo3(name = "SolverConfig")]
+struct PySolverConfig(SolverConfig);
+
 #[pymethods]
-impl SolverConfig {
+impl PySolverConfig {
     #[new]
-    #[pyo3(signature=(gradient_mode=GradientMode::Analytical,
-                      solution_mode=SolutionMode::Speed,
+    #[pyo3(signature=(gradient_mode="analytical",
+                      solution_mode="speed",
                       max_time=0.1,
-                      xtol_abs=1e-10,
-                      ftol_abs=1e-5))]
+                      tol_f=1e-6,
+                      tol_dx=-1.0,
+                      tol_df=-1.0))]
     fn py_new(
-        gradient_mode: GradientMode,
-        solution_mode: SolutionMode,
+        gradient_mode: &str,
+        solution_mode: &str,
         max_time: f64,
-        xtol_abs: f64,
-        ftol_abs: f64,
+        tol_f: f64,
+        tol_dx: f64,
+        tol_df: f64,
     ) -> Self {
-        SolverConfig {
+        let gradient_mode = match gradient_mode {
+            "analytical" => GradientMode::Analytical,
+            "numerical" => GradientMode::Numerical,
+            _ => panic!("invalid gradient mode"),
+        };
+
+        let solution_mode = match solution_mode {
+            "speed" => SolutionMode::Speed,
+            "quality" => SolutionMode::Quality,
+            _ => panic!("invalid solution mode"),
+        };
+
+        PySolverConfig(SolverConfig {
             gradient_mode,
             solution_mode,
             max_time,
-            xtol_abs,
-            ftol_abs,
-        }
+            tol_dx,
+            tol_f,
+            tol_df,
+        })
     }
 }
 
@@ -56,17 +70,11 @@ impl Deref for PyRobot {
 impl PyRobot {
     #[staticmethod]
     fn from_urdf_file(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
-        let chain = k::Chain::<f64>::from_urdf_file(path).unwrap();
+        PyRobot(Robot::from_urdf_file(path, base_link, ee_link))
+    }
 
-        let base_link = chain
-            .find_link(base_link)
-            .unwrap_or_else(|| panic!("link '{}' does not exist!", base_link));
-        let ee_link = chain
-            .find_link(ee_link)
-            .unwrap_or_else(|| panic!("link '{}' does not exist!", ee_link));
-
-        let serial = k::SerialChain::from_end_to_root(ee_link, base_link);
-        PyRobot(Robot::new(serial))
+    pub fn num_positions(&self) -> usize {
+        self.0.num_positions()
     }
 
     fn joint_limits(&self) -> (Vec<f64>, Vec<f64>) {
@@ -93,13 +101,13 @@ impl PyRobot {
 
     fn ik(
         &self,
-        config: &SolverConfig,
+        config: &PySolverConfig,
         target: Vec<Vec<f64>>,
         x0: Vec<f64>,
     ) -> Option<(Vec<f64>, f64)> {
         let robot = &self.0;
 
-        assert_eq!(x0.len(), robot.chain.dof());
+        assert_eq!(x0.len(), self.num_positions());
 
         fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
             let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
@@ -111,16 +119,15 @@ impl PyRobot {
         }
 
         let target = parse_pose(target);
-        robot.ik(config, &target, x0)
+        robot.ik(&config.0, &target, x0)
     }
 }
 
-#[pymodule]
-fn optik(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+#[pymodule()]
+#[pyo3(name = "optikpy")]
+fn optik_extension(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyRobot>()?;
-    m.add_class::<GradientMode>()?;
-    m.add_class::<SolutionMode>()?;
-    m.add_class::<SolverConfig>()?;
+    m.add_class::<PySolverConfig>()?;
     m.add_function(wrap_pyfunction!(set_parallelism, m)?)?;
     Ok(())
 }

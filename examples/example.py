@@ -11,28 +11,32 @@ Usage:
 """
 
 import sys
-import numpy as np
+import time
 
-from optik import Robot, SolverConfig
+import numpy as np
+from optikpy import Robot, SolverConfig
 
 robot = Robot.from_urdf_file(*sys.argv[1:4])
-config = SolverConfig(xtol_abs=1e-20)
+config = SolverConfig()
 
-# Generate a target pose which is known to be valid, but don't tell the
-# optimizer anything about the joint angles we used to get there!
-q_target = np.random.uniform(*robot.joint_limits())
-ee_pose = robot.fk(q_target)
+N = 10000
 
-# Now work backwards and try to solve for a joint configuration which achieves
-# the desired pose, from a random seed.
-q_seed = np.random.uniform(*robot.joint_limits())
-q_opt, c = robot.ik(config, ee_pose, q_seed)
+total_time = 0
+for i in range(N):
+    # Compute a randomized joint configuration to seed the solver.
+    x0 = np.random.uniform(*robot.joint_limits())
 
-np.set_printoptions(precision=2)
-print("EE target pose:")
-print(np.array(ee_pose))
-print("EE solution pose:")
-print(np.array(robot.fk(q_opt)))
-print(f"q_seed: {np.array(q_seed)}")
-print(f"q_opt:  {np.array(q_opt)}")
-print(f"c:      {np.array([c])}")
+    # Generate a target pose which is known to be valid, but don't tell the
+    # optimizer anything about the joint angles we used to get there!
+    q_target = np.random.uniform(*robot.joint_limits())
+    target_ee_pose = robot.fk(q_target)
+
+    start = time.time()
+    q_opt, c = robot.ik(config, target_ee_pose, x0)
+    end = time.time()
+
+    if q_opt is not None:
+        total_time += end - start
+        print("Total time: {}us (to {:.1e})".format(int(1e6 * (end - start)), c))
+
+print("Average time: {}us".format(int(1e6 * total_time / N)))

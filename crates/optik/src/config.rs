@@ -1,27 +1,29 @@
-use pyo3::pyclass;
-
-#[pyclass]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SolutionMode {
     Quality,
     Speed,
 }
 
-#[pyclass]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum GradientMode {
     Analytical,
     Numerical,
 }
 
-#[pyclass(get_all, set_all)]
 #[derive(Debug, Clone)]
 pub struct SolverConfig {
     pub gradient_mode: GradientMode,
     pub solution_mode: SolutionMode,
     pub max_time: f64,
-    pub xtol_abs: f64,
-    pub ftol_abs: f64,
+
+    // Stopping criteria: |f(x)| < tol_f
+    pub tol_f: f64,
+
+    // Stopping criteria: |f(x_{n+1}) - f(x)| < tol_df
+    pub tol_df: f64,
+
+    // Stopping criteria: ||x_{n+1} - x_n|| < tol_dx
+    pub tol_dx: f64,
 }
 
 impl Default for SolverConfig {
@@ -30,8 +32,9 @@ impl Default for SolverConfig {
             gradient_mode: GradientMode::Analytical,
             solution_mode: SolutionMode::Speed,
             max_time: 0.1,
-            xtol_abs: 1e-10,
-            ftol_abs: 1e-5,
+            tol_f: 1e-6,
+            tol_df: -1.0,
+            tol_dx: -1.0,
         }
     }
 }

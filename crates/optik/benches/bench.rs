@@ -4,7 +4,7 @@ use nalgebra::Isometry3;
 
 use optik::*;
 
-const BENCHMARK_MODEL_PATH: &str = "models/ur3e.urdf";
+const BENCHMARK_MODEL_PATH: &str = "../../models/ur3e.urdf";
 const BENCHMARK_MODEL_EE_NAME: &str = "ur_ee_link";
 
 fn load_benchmark_model() -> Robot {

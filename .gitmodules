@@ -1,3 +1,3 @@
 [submodule "slsqp"]
-	path = slsqp-sys/slsqp
+	path = crates/slsqp-sys/slsqp
 	url = https://github.com/jacobwilliams/slsqp

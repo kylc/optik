@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -7,35 +8,51 @@ use std::{
 };
 
 use float_ord::FloatOrd;
-use k::{joint::Range, SerialChain};
+use k::{joint::Range, Chain, SerialChain};
 use nalgebra::{DMatrix, DVector, Isometry3};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use rayon::{
+    prelude::{IntoParallelIterator, ParallelIterator},
+    ThreadPoolBuilder,
+};
 use slsqp_sys::*;
 
 mod config;
 mod math;
-mod py;
 
 pub use config::*;
 use math::*;
 
+pub fn set_parallelism(n: usize) {
+    ThreadPoolBuilder::new()
+        .num_threads(n)
+        .build_global()
+        .unwrap()
+}
+
 #[derive(Clone)]
 pub struct Robot {
-    chain: SerialChain<f64>,
+    pub chain: SerialChain<f64>,
 }
 
 impl Robot {
     pub fn new(chain: SerialChain<f64>) -> Self {
         Self { chain }
     }
-}
 
-impl Robot {
-    pub fn fk(&self, q: &[f64]) -> Isometry3<f64> {
-        self.chain.set_joint_positions_unchecked(q);
-        self.chain.end_transform()
+    pub fn from_urdf_file(path: impl AsRef<Path>, base_link: &str, ee_link: &str) -> Self {
+        let chain = Chain::<f64>::from_urdf_file(path).expect("error parsing URDF file!");
+
+        let base_link = chain
+            .find_link(base_link)
+            .unwrap_or_else(|| panic!("link '{}' does not exist!", base_link));
+        let ee_link = chain
+            .find_link(ee_link)
+            .unwrap_or_else(|| panic!("link '{}' does not exist!", ee_link));
+
+        let serial = SerialChain::from_end_to_root(ee_link, base_link);
+        Robot::new(serial)
     }
 
     pub fn jacobian_local(&self, q: &[f64]) -> DMatrix<f64> {
@@ -44,10 +61,9 @@ impl Robot {
         let mut m = k::jacobian(&self.chain);
 
         // K computes a Jacobian J(q) in Pinocchio's terms as
-        // LOCAL_WORLD_ALIGNED.  Because we compute the compute the right
-        // Jacobian of log SE(3) J_r(X), we prefer to work in body frame.
-        // Convert J(q) into the local body frame (Pinocchio calls this LOCAL
-        // frame).
+        // LOCAL_WORLD_ALIGNED.  Because we compute the right Jacobian of log
+        // SE(3) J_r(X), we prefer to work in body frame.  Convert J(q) into the
+        // local body frame (Pinocchio calls this LOCAL frame).
         let w_inv = t_n.rotation.inverse();
         for mut col in m.column_iter_mut() {
             let mut linear = col.fixed_rows_mut::<3>(0);
@@ -60,6 +76,10 @@ impl Robot {
         }
 
         m
+    }
+
+    pub fn num_positions(&self) -> usize {
+        self.chain.dof()
     }
 
     pub fn joint_limits(&self) -> (DVector<f64>, DVector<f64>) {
@@ -80,6 +100,11 @@ impl Robot {
         (0..self.chain.dof())
             .map(|i| rng.gen_range(lb[i]..=ub[i]))
             .collect()
+    }
+
+    pub fn fk(&self, q: &[f64]) -> Isometry3<f64> {
+        self.chain.set_joint_positions_unchecked(q);
+        self.chain.end_transform()
     }
 
     pub fn ik(
@@ -127,38 +152,61 @@ impl Robot {
                 };
 
                 let mut solver = SlsqpSolver::new(x.len());
-                solver.set_ftol(config.ftol_abs);
-                solver.set_dxtol(config.xtol_abs);
+                solver.set_tol_f(config.tol_f);
+                solver.set_tol_df(config.tol_df);
+                solver.set_tol_dx(config.tol_dx);
                 solver.set_lb(lb.as_slice());
                 solver.set_ub(ub.as_slice());
+
+                // Bookkeeping for stopping criteria.
+                let mut x_prev = x.clone();
+                let mut f_prev = objective(&x, &args);
 
                 // Iterate the soler until any of:
                 // - The solver converges within the tolerance
                 // - Another thread signals that it has converged
                 // - The timeout expires
-                while solver.iterate(
-                    &mut x,
-                    |x| objective(x, &args),
-                    |x, g| objective_grad(x, g, &args),
-                ) == IterationResult::Continue
-                    && !should_exit.load(Ordering::Relaxed)
-                    && Instant::now() < end_time
-                {}
+                while !should_exit.load(Ordering::Relaxed) && Instant::now() < end_time {
+                    match solver.iterate(
+                        &mut x,
+                        |x| objective(x, &args),
+                        |x, g| objective_grad(x, g, &args),
+                    ) {
+                        IterationResult::Continue => {
+                            x_prev.clone_from_slice(&x);
+                            f_prev = solver.cost();
 
-                // TODO: Don't re-evaluate the objective function here. It was
-                // already done in the last iteration of the solver.
-                let f = objective(&x, &args);
-                if f < config.ftol_abs {
-                    // Short-circuit any other threads before we return for a
-                    // modest performance improvement.
-                    if config.solution_mode == SolutionMode::Speed {
-                        should_exit.store(true, Ordering::Relaxed);
+                            continue;
+                        }
+                        IterationResult::Converged => {
+                            // The SLSQP solver can report convergence
+                            // regardless of whether our tol_f, tol_df, nor
+                            // tol_dx conditions are met. If we verify that this
+                            // solution does meet the criteria then it can be
+                            // returned.
+                            let df = solver.cost() - f_prev;
+                            let dx = DVector::from_row_slice(&x) - DVector::from_row_slice(&x_prev);
+
+                            if solver.cost().abs() < config.tol_f
+                                || (config.tol_df > 0.0 && df.abs() < config.tol_df)
+                                || (config.tol_dx > 0.0 && dx.norm().abs() < config.tol_dx)
+                            {
+                                // Short-circuit any other threads for a modest
+                                // performance increase.
+                                if config.solution_mode == SolutionMode::Speed {
+                                    should_exit.store(true, Ordering::Relaxed);
+                                }
+
+                                return Some((x, solver.cost()));
+                            }
+
+                            return None;
+                        }
+                        IterationResult::Error => return None,
                     }
-
-                    Some((x, f))
-                } else {
-                    None
                 }
+
+                None
             })
             .take_any_while(|_| Instant::now() < end_time)
             .flatten();
@@ -171,7 +219,7 @@ impl Robot {
             }
             SolutionMode::Speed => {
                 // Take the first solution which satisfies the tolerance.
-                solution_stream.find_any(|&(_, obj)| obj < config.ftol_abs)
+                solution_stream.find_any(|_| true)
             }
         }
     }

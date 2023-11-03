@@ -2,6 +2,8 @@ name: ci
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 env:
@@ -9,7 +11,6 @@ env:
 
 jobs:
   build_and_test:
-    name: Rust project - latest
     runs-on: ${{ matrix.os }}-latest
     strategy:
       matrix:
@@ -17,15 +18,21 @@ jobs:
           - ubuntu
           - macos
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v3
         with:
           submodules: true
       - name: symlink gfortran (macOS)
-        if: runner.os == 'macos'
+        if: runner.os == 'macOS'
         run: |
           ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
           gfortran --version
+      - name: install Eigen (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libeigen3-dev
+      - name: install Eigen (macOS)
+        if: runner.os == 'macOS'
+        run: brew install eigen
       - run: rustup update stable && rustup default stable
       - run: cargo build --verbose
       - run: cargo test --verbose

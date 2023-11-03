@@ -55,6 +55,7 @@ pub struct SlsqpSolver {
     slsqpb_data: Vec<i32>,
     linmin_data: Vec<i32>,
     tolf: c_double,
+    toldf: c_double,
     toldx: c_double,
 
     f: f64,
@@ -91,8 +92,9 @@ impl SlsqpSolver {
             w: vec![0.0; l_w],
             slsqpb_data: vec![0; 28], // TODO: allocate from slsqpb_data structue,
             linmin_data: vec![0; 36], // TODO: allocate from linmin_data structue,
-            tolf: 0.0,
-            toldx: 0.0,
+            tolf: -1.0,
+            toldf: -1.0,
+            toldx: -1.0,
 
             f: 0.0,
             g: vec![0.0; n],
@@ -101,12 +103,16 @@ impl SlsqpSolver {
         }
     }
 
-    pub fn set_ftol(&mut self, ftol: f64) {
+    pub fn set_tol_f(&mut self, ftol: f64) {
         self.acc = ftol; // TODO
         self.tolf = ftol;
     }
 
-    pub fn set_dxtol(&mut self, dxtol: f64) {
+    pub fn set_tol_df(&mut self, dftol: f64) {
+        self.toldf = dftol;
+    }
+
+    pub fn set_tol_dx(&mut self, dxtol: f64) {
         self.toldx = dxtol;
     }
 
@@ -116,6 +122,10 @@ impl SlsqpSolver {
 
     pub fn set_ub(&mut self, ub: &[f64]) {
         self.xu = ub.to_vec();
+    }
+
+    pub fn cost(&self) -> f64 {
+        self.f
     }
 
     pub fn iterate<O, G>(&mut self, x: &mut [f64], objective: O, gradient: G) -> IterationResult
@@ -154,7 +164,7 @@ impl SlsqpSolver {
                 &0.1,
                 &1.0,
                 &self.tolf,
-                &0.0,
+                &self.toldf,
                 &self.toldx,
                 &0,
                 &1,
