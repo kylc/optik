@@ -18,6 +18,7 @@ extern double* optik_robot_random_configuration(
 extern double* optik_robot_fk(const optik::detail::robot* robot,
                               const double* x);
 extern double* optik_robot_ik(const optik::detail::robot* robot,
+                              const optik::SolverConfig* config,
                               const double* target, const double* x0);
 }
 
@@ -54,13 +55,14 @@ Eigen::Isometry3d Robot::DoFk(const Eigen::VectorXd& q) const {
   return t;
 }
 
-bool Robot::DoIk(const Eigen::Isometry3d& target, const Eigen::VectorXd& x0,
-                 Eigen::VectorXd* q) const {
+bool Robot::DoIk(const SolverConfig& config, const Eigen::Isometry3d& target,
+                 const Eigen::VectorXd& x0, Eigen::VectorXd* q) const {
   if (x0.size() != num_positions()) {
     throw std::runtime_error("dof mismatch");
   }
 
-  double* q_data = optik_robot_ik(inner_, target.matrix().data(), x0.data());
+  double* q_data =
+      optik_robot_ik(inner_, &config, target.matrix().data(), x0.data());
   if (q_data != nullptr) {
     *q = Eigen::Map<Eigen::VectorXd>(q_data, num_positions());
     free(q_data);

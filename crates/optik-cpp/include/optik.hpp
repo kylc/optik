@@ -10,6 +10,25 @@ namespace detail {
 struct robot;
 }  // namespace detail
 
+enum class SolutionMode {
+  kQuality = 1,
+  kSpeed = 2,
+};
+
+enum class GradientMode {
+  kAnalytical = 1,
+  kNumerical = 2,
+};
+
+struct SolverConfig {
+  SolutionMode solution_mode = SolutionMode::kSpeed;
+  GradientMode gradient_mode = GradientMode::kAnalytical;
+  double max_time = 0.1;
+  double tol_f = 1e-6;
+  double tol_df = -1.0;
+  double tol_dx = -1.0;
+};
+
 //! Sets the number of threads to be used for various parallel operations within
 //! subsequent library calls.
 //!
@@ -48,8 +67,8 @@ class Robot final {
   //! If `true` is returned, then out-parameter `q` will contain an inverse
   //! kinematics solution. Otherwise, the solver has not converged and `q` will
   //! be left untouched.
-  bool DoIk(const Eigen::Isometry3d& target, const Eigen::VectorXd& x0,
-            Eigen::VectorXd* q) const;
+  bool DoIk(const SolverConfig& config, const Eigen::Isometry3d& target,
+            const Eigen::VectorXd& x0, Eigen::VectorXd* q) const;
 
   //! Returns the size of the generalized position vector of this robot.
   unsigned int num_positions() const noexcept;

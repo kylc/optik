@@ -1,5 +1,3 @@
-// g++ -Wall -Wextra -std=c++11 -O2 $(pkg-config --cflags eigen3) -Icrates/optik-cpp/include examples/example.cpp target/release/liboptikcpp.a -lgfortran
-
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -21,7 +19,9 @@ int main(int argc, char **argv) {
   optik::SetParallelism(std::thread::hardware_concurrency() / 2);
   const auto robot = optik::Robot::FromUrdfFile(argv[1], argv[2], argv[3]);
 
-  int n = 10000;
+  optik::SolverConfig config;
+
+  int n = 1000;
   int total_us = 0;
 
   for (int i = 0; i < n; i++) {
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 
     auto start = steady_clock::now();
     Eigen::VectorXd q;
-    robot.DoIk(target_ee_pose, x0, &q);
+    robot.DoIk(config, target_ee_pose, x0, &q);
     auto end = steady_clock::now();
 
     auto us = duration_cast<microseconds>(end - start).count();

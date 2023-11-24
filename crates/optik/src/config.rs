@@ -1,13 +1,15 @@
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(C)]
 pub enum SolutionMode {
-    Quality,
-    Speed,
+    Quality = 1,
+    Speed = 2,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(C)]
 pub enum GradientMode {
-    Analytical,
-    Numerical,
+    Analytical = 1,
+    Numerical = 2,
 }
 
 #[derive(Debug, Clone)]

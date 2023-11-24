@@ -5,7 +5,17 @@ use std::{
 
 use nalgebra::{DMatrix, Isometry3, Translation3, UnitQuaternion};
 
-use optik::{Robot, SolverConfig};
+use optik::{GradientMode, Robot, SolutionMode, SolverConfig};
+
+#[repr(C)]
+struct CSolverConfig {
+    solution_mode: SolutionMode,
+    gradient_mode: GradientMode,
+    max_time: c_double,
+    tol_f: c_double,
+    tol_df: c_double,
+    tol_dx: c_double,
+}
 
 fn to_str(c_str: *const c_char) -> &'static str {
     unsafe { CStr::from_ptr(c_str).to_str().unwrap() }
@@ -83,6 +93,7 @@ extern "C" fn optik_robot_random_configuration(robot: *const Robot) -> *const c_
 #[no_mangle]
 extern "C" fn optik_robot_ik(
     robot: *const Robot,
+    config: *const CSolverConfig,
     target: *const c_double,
     x0: *const c_double,
 ) -> *const c_double {
@@ -99,7 +110,12 @@ extern "C" fn optik_robot_ik(
         let ee_pose = Isometry3::from_parts(t, r);
 
         let config = SolverConfig {
-            ..Default::default()
+            gradient_mode: (*config).gradient_mode,
+            solution_mode: (*config).solution_mode,
+            max_time: (*config).max_time,
+            tol_f: (*config).tol_f,
+            tol_df: (*config).tol_df,
+            tol_dx: (*config).tol_dx,
         };
         if let Some((v, _)) = robot.ik(&config, &ee_pose, x0.to_vec()) {
             v.leak().as_ptr()
