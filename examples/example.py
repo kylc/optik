@@ -14,7 +14,7 @@ import sys
 import time
 
 import numpy as np
-from optikpy import Robot, SolverConfig
+from optik import Robot, SolverConfig
 
 robot = Robot.from_urdf_file(*sys.argv[1:4])
 config = SolverConfig()

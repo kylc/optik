@@ -124,7 +124,7 @@ impl PyRobot {
 }
 
 #[pymodule()]
-#[pyo3(name = "optikpy")]
+#[pyo3(name = "optik")]
 fn optik_extension(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyRobot>()?;
     m.add_class::<PySolverConfig>()?;
