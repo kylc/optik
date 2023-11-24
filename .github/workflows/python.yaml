@@ -7,13 +7,17 @@ on:
   pull_request:
 
 jobs:
-  build:
+  build_wheels:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os:
           - ubuntu-latest
           - macos-latest
+        include:
+          - os: macos-latest
+            target: universal2-apple-darwin
+
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -40,12 +44,12 @@ jobs:
           name: wheels
           path: dist
 
-  pre-release:
+  upload_release:
     if: github.ref == 'refs/heads/master'
     concurrency:
       group: push-${{ github.ref_name }}-prerelease
       cancel-in-progress: true
-    needs: [build]
+    needs: [build_wheels]
     runs-on: "ubuntu-latest"
     steps:
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
