@@ -7,16 +7,24 @@ on:
   pull_request:
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ matrix.os }}-latest
     strategy:
       matrix:
-        target: [x86_64, i686]
+        os:
+          - ubuntu
+          - macos
+
     steps:
       - name: checkout
         uses: actions/checkout@v3
         with:
           submodules: true
+      - name: symlink gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
+          gfortran --version
       - uses: actions/setup-python@v4
         with:
           python-version: 3.9
@@ -37,7 +45,7 @@ jobs:
     concurrency:
       group: push-${{ github.ref_name }}-prerelease
       cancel-in-progress: true
-    needs: [linux]
+    needs: [build]
     runs-on: "ubuntu-latest"
     steps:
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
