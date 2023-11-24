@@ -35,6 +35,12 @@ Timing is of a single inverse kinematics solve.
 
 ### Python
 
+``` sh
+python3 -m pip install optik
+```
+
+Or, to install a prerelease version:
+
 1. Download a recent `.whl` from [GitHub Releases](https://github.com/kylc/optik/releases)
 2. Run `pip install optik<...>.whl` (replace `<...>` with the actual filename)
 3. Test it: `python -c 'import optik'`

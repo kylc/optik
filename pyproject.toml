@@ -1,0 +1,25 @@
+[project]
+name = "optik"
+version = "0.1.0"
+description = "An optimizing IK solver based on the Lie group of rigid transforms SE(3)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT OR Apache-2.0"
+authors = [
+  {email = "kcesare@gmail.com"},
+  {name = "Kyle Cesare"}
+]
+classifiers = [
+  "Topic :: Scientific/Engineering"
+]
+dependencies = []
+
+[project.urls]
+homepage = "https://github.com/kylc/optik"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+manifest-path = "crates/optik-py/Cargo.toml"
