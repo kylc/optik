@@ -27,12 +27,6 @@ jobs:
         run: |
           ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
           gfortran --version
-      - name: install Eigen (Ubuntu)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y libeigen3-dev
-      - name: install Eigen (macOS)
-        if: runner.os == 'macOS'
-        run: brew install eigen
       - run: rustup update stable && rustup default stable
       - run: cargo build --verbose
       - run: cargo test --verbose
