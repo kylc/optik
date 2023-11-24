@@ -1,25 +1,35 @@
 name: ci
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-
-env:
-  CARGO_TERM_COLOR: always
+on: [push, pull_request]
 
 jobs:
-  build_and_test:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo check
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+        os: [ubuntu-latest, macos-latest]
     steps:
-      - name: checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: symlink gfortran (macOS)
@@ -27,6 +37,5 @@ jobs:
         run: |
           ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
           gfortran --version
-      - run: rustup update stable && rustup default stable
-      - run: cargo build --verbose
-      - run: cargo test --verbose
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --all

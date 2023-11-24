@@ -1,26 +1,21 @@
 name: python
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   build_wheels:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
         include:
+          - os: ubuntu-latest
+            target: x86_64
           - os: macos-latest
             target: universal2-apple-darwin
 
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
       - name: symlink gfortran (macOS)
@@ -28,16 +23,21 @@ jobs:
         run: |
           ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
           gfortran --version
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v4
         with:
           python-version: 3.9
           architecture: x64
-      - name: build wheels
+      - name: build wheel
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
           args: --release -m crates/optik-py/Cargo.toml --out dist
+      - name: install built wheel
+        run: |
+          pip install optik_py --no-index --find-links dist
+          python -c "import optik"
       - name: upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -46,11 +46,11 @@ jobs:
 
   upload_release:
     if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
     concurrency:
       group: push-${{ github.ref_name }}-prerelease
       cancel-in-progress: true
     needs: [build_wheels]
-    runs-on: "ubuntu-latest"
     steps:
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
@@ -64,8 +64,6 @@ jobs:
           name: wheels
           path: wheels
 
-      # Create the actual prerelease
-      # https://github.com/ncipollo/release-action
       - name: GitHub release
         uses: ncipollo/release-action@v1.12.0
         with:
