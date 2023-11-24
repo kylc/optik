@@ -8,13 +8,12 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os:
-          - ubuntu
-          - macos
-
+          - ubuntu-latest
+          - macos-latest
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -42,6 +41,7 @@ jobs:
           path: dist
 
   pre-release:
+    if: github.ref == 'refs/heads/master'
     concurrency:
       group: push-${{ github.ref_name }}-prerelease
       cancel-in-progress: true
