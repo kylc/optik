@@ -40,7 +40,6 @@ fn main() {
     assert!(Command::new("ar")
         .args([
             "crus",
-            // "libslsqp_partial.a",
             "libslsqp.a",
             "slsqp_kinds.F90.o",
             "slsqp_support.f90.o",
