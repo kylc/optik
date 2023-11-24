@@ -63,6 +63,24 @@ Add OptIK as a Cargo dependency:
 cargo add optik
 ```
 
+### Building Locally
+
+``` sh
+git clone git@github.com:kylc/optik.git
+
+# Build the Rust library
+cargo build --release
+
+# Build a Python wheel
+maturin build --release -m crates/optik-py/Cargo.toml
+
+# Build the C++ example
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ../examples
+cmake --build .
+```
+
 ## Usage
 
 https://github.com/kylc/optik/blob/4ef93d4bbee9571bb9a7869e73dc8d911ed9079e/examples/example.py#L22-L30
