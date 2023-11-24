@@ -1,0 +1,18 @@
+[package]
+name = "optik-py"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "optik"
+crate-type = ["cdylib"]
+
+[build-dependencies]
+pyo3-build-config = "0.19"
+
+[dependencies]
+nalgebra = "0.30"
+optik = { path = "../optik" }
+pyo3 = { version = "0.19", features = ["extension-module", "abi3-py38"] }

@@ -2,6 +2,8 @@ name: ci
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 env:
@@ -9,20 +11,19 @@ env:
 
 jobs:
   build_and_test:
-    name: Rust project - latest
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os:
-          - ubuntu
-          - macos
+          - ubuntu-latest
+          - macos-latest
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v3
         with:
           submodules: true
       - name: symlink gfortran (macOS)
-        if: runner.os == 'macos'
+        if: runner.os == 'macOS'
         run: |
           ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
           gfortran --version

@@ -1,0 +1,30 @@
+[package]
+name = "optik"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "optik"
+crate-type = ["rlib"]
+
+[dependencies]
+float-ord = "0.3"
+k = "0.31"
+nalgebra = "0.30"
+rand = "0.8"
+rand_chacha = "0.3"
+rayon = "1.8"
+slsqp-sys = { path = "../slsqp-sys" }
+
+[[example]]
+name = "example"
+path = "../../examples/example.rs"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "bench"
+harness = false

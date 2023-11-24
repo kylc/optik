@@ -1,42 +1,55 @@
-name: Python
+name: python
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
+  build_wheels:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        target: [x86_64, i686]
+        os:
+          - ubuntu-latest
+          - macos-latest
+        include:
+          - os: macos-latest
+            target: universal2-apple-darwin
+
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v3
         with:
           submodules: true
+      - name: symlink gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
+          gfortran --version
       - uses: actions/setup-python@v4
         with:
           python-version: 3.9
           architecture: x64
-      - name: Build wheels
+      - name: build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist
-      - name: Upload wheels
+          args: --release -m crates/optik-py/Cargo.toml --out dist
+      - name: upload wheels
         uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: dist
 
-  pre-release:
-    name: Pre Release
+  upload_release:
+    if: github.ref == 'refs/heads/master'
     concurrency:
       group: push-${{ github.ref_name }}-prerelease
       cancel-in-progress: true
-    needs: [linux]
+    needs: [build_wheels]
     runs-on: "ubuntu-latest"
     steps:
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
@@ -53,7 +66,7 @@ jobs:
 
       # Create the actual prerelease
       # https://github.com/ncipollo/release-action
-      - name: GitHub Release
+      - name: GitHub release
         uses: ncipollo/release-action@v1.12.0
         with:
           prerelease: true

@@ -1,0 +1,15 @@
+[package]
+name = "optik-cpp"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "optikcpp"
+crate-type = ["staticlib"]
+
+[dependencies]
+nalgebra = "0.30"
+optik = { path = "../optik" }
+rand = "0.8"

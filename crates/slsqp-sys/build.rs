@@ -4,6 +4,7 @@ fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let target = env::var("TARGET").unwrap();
 
+    // *.o: *.f90 *.F90
     for src_file in [
         "slsqp_kinds.F90",
         "slsqp_support.f90",
@@ -23,6 +24,7 @@ fn main() {
                 "-fimplicit-none",
                 "-Werror=implicit-interface",
                 "-ffree-form",
+                "-static-libgfortran",
             ])
             .arg("-J")
             .arg(&out_dir)
@@ -34,6 +36,7 @@ fn main() {
             .success());
     }
 
+    // libslsqp.a: *.o
     assert!(Command::new("ar")
         .args([
             "crus",
@@ -48,9 +51,6 @@ fn main() {
         .status()
         .unwrap()
         .success());
-
-    println!("cargo:rustc-link-search=native={}", out_dir);
-    println!("cargo:rustc-link-lib=static=slsqp");
 
     let libgfortran_path = String::from_utf8(
         Command::new("gfortran")
@@ -70,6 +70,11 @@ fn main() {
 
     assert!(!libgfortran_path.is_empty(), "failed to find libgfortran");
 
+    // Tell Cargo where to find libslsqp
+    println!("cargo:rustc-link-search=native={}", out_dir);
+    println!("cargo:rustc-link-lib=static=slsqp");
+
+    // Tell Cargo to dynamic link libgfortran and libquadmath
     println!(
         "cargo:rustc-link-search=native={}",
         Path::new(&libgfortran_path)
@@ -77,5 +82,6 @@ fn main() {
             .unwrap()
             .to_string_lossy()
     );
-    println!("cargo:rustc-link-lib=dylib={}", "gfortran");
+    println!("cargo:rustc-link-lib=dylib=gfortran");
+    println!("cargo:rustc-link-lib=dylib=quadmath");
 }
