@@ -4,24 +4,21 @@ project(optik VERSION 0.1.0)
 find_package(Eigen3 REQUIRED)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(CARGO_CMD cargo build --verbose)
+  set(CARGO_CMD cargo build)
   set(TARGET_DIR "debug")
 else()
-  set(CARGO_CMD cargo build --release --verbose)
+  set(CARGO_CMD cargo build --release)
   set(TARGET_DIR "release")
 endif()
 
-set(OPTIK_CPP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
-set(OPTIK_CPP_SRC "${OPTIK_CPP_ROOT}/src/lib.cpp")
+set(OPTIK_CPP_SRC "${CMAKE_CURRENT_LIST_DIR}/src/lib.cpp")
 set(OPTIK_CPP_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/liboptikcpp.a")
 
 # Add a custom target to build the native library using cargo.
 add_custom_target(optikcpp_build ALL DEPENDS ${OPTIK_CPP_LIB})
 add_custom_command(
-  OUTPUT ${OPTIK_CPP_LIB}
-  COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}"
-          ${CARGO_CMD}
-  WORKING_DIRECTORY ${OPTIK_CPP_ROOT})
+  OUTPUT ${OPTIK_CPP_LIB} COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                                  RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD})
 
 # Add a nicer target for downstream use.
 add_library(optik STATIC src/lib.cpp)
@@ -31,6 +28,8 @@ target_include_directories(
                $<INSTALL_INTERFACE:include>)
 target_link_libraries(optik PUBLIC Eigen3::Eigen gfortran ${OPTIK_CPP_LIB})
 set_property(TARGET optik PROPERTY CXX_STANDARD 11)
+
+add_library(optik::optik ALIAS optik)
 
 # Install
 include(CMakePackageConfigHelpers)
