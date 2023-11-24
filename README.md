@@ -33,9 +33,35 @@ Timing is of a single inverse kinematics solve.
 
 ## Setup
 
+### Python
+
 1. Download a recent `.whl` from [GitHub Releases](https://github.com/kylc/optik/releases)
 2. Run `pip install optik<...>.whl` (replace `<...>` with the actual filename)
 3. Test it: `python -c 'import optik'`
+
+### C++ (CMake)
+
+Include OptIK in your CMake project using `FetchContent`:
+
+``` cmake
+include(FetchContent)
+FetchContent_Declare(
+  optik
+  GIT_REPOSITORY https://github.com/kylc/optik
+  GIT_TAG master
+  SOURCE_SUBDIR "crates/optik-cpp")
+FetchContent_MakeAvailable(optik)
+
+target_link_libraries(mylib PRIVATE optik::optik)
+```
+
+### Rust
+
+Add OptIK as a Cargo dependency:
+
+``` sh
+cargo add optik
+```
 
 ## Usage
 
