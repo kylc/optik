@@ -42,7 +42,7 @@ jobs:
           delocate-wheel -v dist/*.whl
       - name: install built wheel
         run: |
-          pip install optik --no-index --find-links dist
+          pip install optik-py --no-index --find-links dist
           python -c "import optik"
       - name: upload wheels
         uses: actions/upload-artifact@v3
