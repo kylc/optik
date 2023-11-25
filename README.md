@@ -4,6 +4,7 @@
     <img alt="MIT"    src="https://img.shields.io/badge/license-MIT-blue.svg">
     <img alt="Apache" src="https://img.shields.io/badge/license-Apache-blue.svg">
     <img alt="CI"     src="https://github.com/kylc/optik/actions/workflows/ci.yaml/badge.svg">
+    <img alt="PyPI"   src="https://img.shields.io/pypi/v/optik-py.svg">
     <a href="https://zenodo.org/badge/latestdoi/696468110"><img src="https://zenodo.org/badge/696468110.svg" alt="DOI"></a>
 </p>
 
