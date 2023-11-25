@@ -28,6 +28,7 @@ jobs:
         with:
           python-version: 3.9
           architecture: x64
+      - uses: Swatinem/rust-cache@v2
       - name: build wheel
         uses: PyO3/maturin-action@v1
         with:

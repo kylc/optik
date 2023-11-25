@@ -10,6 +10,7 @@ jobs:
         with:
           submodules: true
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - run: cargo check
 
   fmt:
@@ -21,6 +22,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+      - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
 
   test:
@@ -38,4 +40,5 @@ jobs:
           ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
           gfortran --version
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - run: cargo test --all
