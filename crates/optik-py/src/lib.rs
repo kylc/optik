@@ -89,7 +89,7 @@ impl PyRobot {
     fn fk(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
-        assert_eq!(x.len(), robot.chain.dof());
+        assert_eq!(x.len(), robot.num_positions());
 
         let ee_pose = robot.fk(&x);
         ee_pose
