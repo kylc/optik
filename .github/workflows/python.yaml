@@ -73,13 +73,6 @@ jobs:
       cancel-in-progress: true
     needs: [build_wheels, sdist]
     steps:
-      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
-        with:
-          tag_name: prerelease
-          delete_release: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: actions/download-artifact@v3
         with:
           name: wheels
