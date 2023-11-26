@@ -3,6 +3,7 @@ project(optik VERSION 0.1.0)
 
 find_package(Eigen3 REQUIRED)
 
+set(CARGO_MANIFEST ${CMAKE_CURRENT_LIST_DIR}/Cargo.toml)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CARGO_CMD cargo build)
   set(TARGET_DIR "debug")
@@ -17,8 +18,10 @@ set(OPTIK_CPP_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/liboptikcpp.a")
 # Add a custom target to build the native library using cargo.
 add_custom_target(optikcpp_build ALL DEPENDS ${OPTIK_CPP_LIB})
 add_custom_command(
-  OUTPUT ${OPTIK_CPP_LIB} COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}
-                                  RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD})
+  OUTPUT ${OPTIK_CPP_LIB}
+  COMMAND
+    CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}"
+    ${CARGO_CMD} --manifest-path ${CARGO_MANIFEST})
 
 # Add a nicer target for downstream use.
 add_library(optik STATIC src/lib.cpp)
@@ -54,4 +57,3 @@ install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
 install(FILES include/optik.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(TARGETS optik FILE_SET HEADERS)
