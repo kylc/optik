@@ -110,7 +110,7 @@ pub mod se3 {
 
     // Reference: Pinocchio
     fn jacobian_upper_right_block(iso: Isometry3<f64>) -> Matrix3<f64> {
-        let w = log(iso).fixed_rows::<3>(3).into_owned();
+        let w = se3::log(iso).fixed_rows::<3>(3).into_owned();
         let t = w.norm();
         let t2 = t * t;
 
@@ -147,10 +147,10 @@ pub mod se3 {
     // [1]: https://github.com/artivis/manif
     // [2]: https://github.com/strasdat/Sophus
     pub fn right_jacobian(tfm: Isometry3<f64>) -> Matrix6<f64> {
-        let omega = log(tfm).fixed_rows::<3>(3).into_owned();
+        let omega = se3::log(tfm).fixed_rows::<3>(3).into_owned();
 
         let j = so3::right_jacobian(omega);
-        let q = jacobian_upper_right_block(tfm);
+        let q = se3::jacobian_upper_right_block(tfm);
 
         let mut u = Matrix6::zeros();
         u.fixed_slice_mut::<3, 3>(0, 0).copy_from(&j);
