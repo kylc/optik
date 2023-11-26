@@ -16,15 +16,9 @@ fn main() {
             .args([
                 "-c",
                 &format!("slsqp/src/{}", src_file),
-                "-O3",
+                "-Ofast",
                 "-funroll-loops",
-                "-fPIC",
-                "-fmax-errors=1",
-                "-fcoarray=single",
-                "-fimplicit-none",
-                "-Werror=implicit-interface",
-                "-ffree-form",
-                "-static-libgfortran",
+                "-fPIC"
             ])
             .arg("-J")
             .arg(&out_dir)
