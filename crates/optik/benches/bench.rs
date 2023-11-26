@@ -1,6 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nalgebra::Isometry3;
 
+use optik::kinematics::KinematicsCache;
+use optik::objective::ObjectiveArgs;
 use optik::*;
 
 const BENCH_MODEL_STR: &str = include_str!("../tests/data/ur3e.urdf");
@@ -9,61 +11,81 @@ fn load_benchmark_model() -> Robot {
     Robot::from_urdf_str(BENCH_MODEL_STR, "ur_base_link", "ur_ee_link")
 }
 
-fn bench_jacobian(c: &mut Criterion) {
+fn bench_jacobian(_c: &mut Criterion) {
     let robot = load_benchmark_model();
-    let q = robot.random_configuration(&mut rand::thread_rng());
+    let _q = robot.random_configuration(&mut rand::thread_rng());
 
-    c.bench_function("jacobian", |b| {
-        b.iter(|| robot.jacobian_local(black_box(&q)))
-    });
+    // c.bench_function("jacobian", |b| {
+    //     b.iter(|| robot.jacobian_local(black_box(&q)))
+    // });
 }
 
 fn bench_gradient(c: &mut Criterion) {
+    use optik::objective::objective_grad;
+
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
     let mut g = vec![0.0; q.len()];
     let tfm_target = Isometry3::identity();
     let args = ObjectiveArgs {
-        robot,
-        config: SolverConfig::default(),
-        tfm_target,
+        robot: &robot,
+        config: &SolverConfig::default(),
+        tfm_target: &tfm_target,
     };
 
     c.bench_function("gradient_analytical", |b| {
         let args = ObjectiveArgs {
-            config: SolverConfig {
+            config: &SolverConfig {
                 gradient_mode: GradientMode::Analytical,
-                ..args.config
+                ..*args.config
             },
             ..args.clone()
         };
-        b.iter(|| objective_grad(black_box(&q), &mut g, &args))
+        b.iter(|| {
+            objective_grad(
+                black_box(&q),
+                &mut g,
+                &args,
+                &mut KinematicsCache::default(),
+            )
+        })
     });
 
     c.bench_function("gradient_numerical", |b| {
         let args = ObjectiveArgs {
-            config: SolverConfig {
+            config: &SolverConfig {
                 gradient_mode: GradientMode::Numerical,
-                ..args.config
+                ..*args.config
             },
             ..args.clone()
         };
-        b.iter(|| objective_grad(black_box(&q), &mut g, &args))
+        b.iter(|| {
+            objective_grad(
+                black_box(&q),
+                &mut g,
+                &args,
+                &mut KinematicsCache::default(),
+            )
+        })
     });
 }
 
 fn bench_objective(c: &mut Criterion) {
+    use optik::objective::objective;
+
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
     let tfm_target = Isometry3::identity();
     let args = ObjectiveArgs {
-        robot,
-        config: SolverConfig::default(),
-        tfm_target,
+        robot: &robot,
+        config: &SolverConfig::default(),
+        tfm_target: &tfm_target,
     };
-    c.bench_function("objective", |b| b.iter(|| objective(black_box(&q), &args)));
+    c.bench_function("objective", |b| {
+        b.iter(|| objective(black_box(&q), &args, &mut KinematicsCache::default()))
+    });
 }
 
 fn bench_ik(c: &mut Criterion) {

@@ -1,6 +1,10 @@
 use approx::assert_abs_diff_eq;
 use nalgebra::Vector6;
-use optik::{objective_grad, GradientMode, ObjectiveArgs, Robot, SolverConfig};
+use optik::{
+    kinematics::KinematicsCache,
+    objective::{objective_grad, ObjectiveArgs},
+    GradientMode, Robot, SolverConfig,
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const TEST_MODEL_STR: &str = include_str!("data/ur3e.urdf");
@@ -14,19 +18,41 @@ fn test_gradient_analytical_vs_numerical() {
         let x0: Vector6<f64> = rng.gen();
         let tfm_target = rng.gen();
 
-        let mut args = ObjectiveArgs {
-            robot: robot.clone(),
-            config: SolverConfig::default(),
-            tfm_target,
+        // Analytical gradient
+        let args = ObjectiveArgs {
+            robot: &robot,
+            config: &SolverConfig {
+                gradient_mode: GradientMode::Analytical,
+                ..Default::default()
+            },
+            tfm_target: &tfm_target,
         };
 
         let mut g_a = Vector6::zeros();
-        args.config.gradient_mode = GradientMode::Analytical;
-        objective_grad(x0.as_slice(), g_a.as_mut_slice(), &args);
+        objective_grad(
+            x0.as_slice(),
+            g_a.as_mut_slice(),
+            &args,
+            &mut KinematicsCache::default(),
+        );
+
+        // Numerical gradient
+        let args = ObjectiveArgs {
+            robot: &robot,
+            config: &SolverConfig {
+                gradient_mode: GradientMode::Numerical,
+                ..Default::default()
+            },
+            tfm_target: &tfm_target,
+        };
 
         let mut g_n = Vector6::zeros();
-        args.config.gradient_mode = GradientMode::Numerical;
-        objective_grad(x0.as_slice(), g_n.as_mut_slice(), &args);
+        objective_grad(
+            x0.as_slice(),
+            g_n.as_mut_slice(),
+            &args,
+            &mut KinematicsCache::default(),
+        );
 
         assert_abs_diff_eq!(g_a, g_n, epsilon = 1e-6);
     }

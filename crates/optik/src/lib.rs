@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -7,8 +8,8 @@ use std::{
     time::Instant,
 };
 
-use k::{joint::Range, Chain, SerialChain};
-use nalgebra::{DMatrix, DVector, DVectorSlice, Isometry3};
+use k::{joint::Range, Chain, JointType, SerialChain};
+use nalgebra::{DVector, DVectorSlice, Isometry3, Matrix6xX};
 use ordered_float::OrderedFloat;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -19,10 +20,13 @@ use rayon::{
 use slsqp_sys::*;
 
 mod config;
+pub mod kinematics;
 pub mod math;
+pub mod objective;
 
 pub use config::*;
-use math::*;
+use kinematics::*;
+use objective::*;
 
 pub fn set_parallelism(n: usize) {
     ThreadPoolBuilder::new()
@@ -33,12 +37,37 @@ pub fn set_parallelism(n: usize) {
 
 #[derive(Clone)]
 pub struct Robot {
-    pub chain: SerialChain<f64>,
+    chain: SerialChain<f64>,
+    joints: Vec<Joint<f64>>,
+    ee_offset: Isometry3<f64>,
 }
 
 impl Robot {
     pub fn new(chain: SerialChain<f64>) -> Self {
-        Self { chain }
+        let mut joints = vec![];
+        let mut fixed_offset = Isometry3::identity();
+        for node in chain.iter() {
+            let joint = node.joint();
+            match joint.joint_type {
+                JointType::Rotational { axis } => {
+                    joints.push(Joint::revolute(joint.origin() * fixed_offset, axis));
+                    fixed_offset = Isometry3::identity();
+                }
+                JointType::Linear { axis } => {
+                    joints.push(Joint::prismatic(joint.origin() * fixed_offset, axis));
+                    fixed_offset = Isometry3::identity();
+                }
+                JointType::Fixed {} => {
+                    fixed_offset *= joint.origin();
+                }
+            }
+        }
+
+        Self {
+            chain,
+            joints,
+            ee_offset: fixed_offset,
+        }
     }
 
     pub fn from_urdf_file(path: impl AsRef<Path>, base_link: &str, ee_link: &str) -> Self {
@@ -65,31 +94,8 @@ impl Robot {
         Robot::new(serial)
     }
 
-    pub fn jacobian_local(&self, q: &[f64]) -> DMatrix<f64> {
-        let t_n = self.fk(q); // this updates the joint positions
-
-        let mut m = k::jacobian(&self.chain);
-
-        // K computes a Jacobian J(q) in Pinocchio's terms as
-        // LOCAL_WORLD_ALIGNED.  Because we compute the right Jacobian of log
-        // SE(3) J_r(X), we prefer to work in body frame.  Convert J(q) into the
-        // local body frame (Pinocchio calls this LOCAL frame).
-        let w_inv = t_n.rotation.inverse();
-        for mut col in m.column_iter_mut() {
-            let mut linear = col.fixed_rows_mut::<3>(0);
-            let linear_w = w_inv * &linear;
-            linear.copy_from(&linear_w);
-
-            let mut angular = col.fixed_rows_mut::<3>(3);
-            let angular_w = w_inv * &angular;
-            angular.copy_from(&angular_w);
-        }
-
-        m
-    }
-
     pub fn num_positions(&self) -> usize {
-        self.chain.dof()
+        self.joints.len()
     }
 
     pub fn joint_limits(&self) -> (DVector<f64>, DVector<f64>) {
@@ -107,14 +113,20 @@ impl Robot {
 
     pub fn random_configuration(&self, rng: &mut impl rand::Rng) -> Vec<f64> {
         let (lb, ub) = self.joint_limits();
-        (0..self.chain.dof())
+        (0..self.num_positions())
             .map(|i| rng.gen_range(lb[i]..=ub[i]))
             .collect()
     }
 
+    pub fn joint_jacobian(&self, frames: &[Isometry3<f64>]) -> Matrix6xX<f64> {
+        joint_jacobian(&self.joints, &self.ee_offset, frames)
+    }
+
     pub fn fk(&self, q: &[f64]) -> Isometry3<f64> {
-        self.chain.set_joint_positions_unchecked(q);
-        self.chain.end_transform()
+        joint_kinematics(&self.joints, q)
+            .last()
+            .unwrap_or_else(Isometry3::identity)
+            * self.ee_offset
     }
 
     pub fn ik(
@@ -163,10 +175,11 @@ impl Robot {
                 let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
                 rng.set_stream(i);
 
+                let cache = RefCell::new(KinematicsCache::default());
                 let args = ObjectiveArgs {
-                    robot: self.clone(),
-                    config: config.clone(),
-                    tfm_target: *tfm_target,
+                    robot: self,
+                    config,
+                    tfm_target,
                 };
 
                 // The first attempt gets the initial seed provided by the caller.
@@ -186,17 +199,17 @@ impl Robot {
 
                 // Bookkeeping for stopping criteria.
                 let mut x_prev = x.clone();
-                let mut f_prev = objective(&x, &args);
+                let mut f_prev = objective(&x, &args, &mut cache.borrow_mut());
 
-                // Iterate the soler until any of:
-                // - The solver converges within the tolerance
-                // - Another thread signals that it has converged
-                // - The timeout expires
+                // Iterate the solver until any of:
+                // - The solver converges within the active convergence criteria
+                // - Another thread arrives at a solution (in speed mode)
+                // - The specified timeout expires
                 while !should_exit.load(Ordering::Relaxed) && !is_timed_out() {
                     match solver.iterate(
                         &mut x,
-                        |x| objective(x, &args),
-                        |x, g| objective_grad(x, g, &args),
+                        |x| objective(x, &args, &mut cache.borrow_mut()),
+                        |x, g| objective_grad(x, g, &args, &mut cache.borrow_mut()),
                     ) {
                         IterationResult::Continue => {
                             x_prev.copy_from_slice(&x);
@@ -206,19 +219,31 @@ impl Robot {
                         }
                         IterationResult::Converged => {
                             // The SLSQP solver can report convergence
-                            // regardless of whether our tol_f, tol_df, nor
+                            // regardless of whether our tol_f, tol_df, or
                             // tol_dx conditions are met. If we verify that this
                             // solution does meet the criteria then it can be
                             // returned.
+                            //
+                            // This is due to an internal `accuracy` parameter,
+                            // which reports convergence if the change in
+                            // objective function falls below it.
                             let df = solver.cost() - f_prev;
-                            let dx = DVector::from_row_slice(&x) - DVector::from_row_slice(&x_prev);
+                            let dx = DVectorSlice::from_slice(&x, x.len())
+                                - DVectorSlice::from_slice(&x_prev, x_prev.len());
 
+                            // Report convergence if _any_ of the active
+                            // convergence criteria are met.
                             if solver.cost().abs() < config.tol_f
                                 || (config.tol_df > 0.0 && df.abs() < config.tol_df)
                                 || (config.tol_dx > 0.0 && dx.norm().abs() < config.tol_dx)
                             {
                                 // Short-circuit any other threads for a modest
                                 // performance increase.
+                                //
+                                // In `Speed` mode, if the current thread has
+                                // converged on a satisfactory solution then we
+                                // don't care what the others are going to
+                                // produce.
                                 if config.solution_mode == SolutionMode::Speed {
                                     should_exit.store(true, Ordering::Relaxed);
                                 }
@@ -243,8 +268,8 @@ impl Robot {
                 // best of all solutions. In this case, the cost of a given
                 // solution is computed as its distance from the seed.
                 solution_stream.min_by_key(|(x, _)| {
-                    let x = DVectorSlice::from_slice(x, self.num_positions());
-                    let x0 = DVectorSlice::from_slice(&x0, self.num_positions());
+                    let x = DVectorSlice::from_slice(x, x.len());
+                    let x0 = DVectorSlice::from_slice(&x0, x0.len());
 
                     OrderedFloat(x.metric_distance(&x0))
                 })
@@ -252,89 +277,6 @@ impl Robot {
             SolutionMode::Speed => {
                 // Take the first solution which satisfies the tolerance.
                 solution_stream.find_any(|_| true)
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ObjectiveArgs {
-    pub robot: Robot,
-    pub config: SolverConfig,
-    pub tfm_target: Isometry3<f64>,
-}
-
-pub fn objective(q: &[f64], args: &ObjectiveArgs) -> f64 {
-    // Compute the pose error w.r.t. the actual pose:
-    //
-    //   X_AT = X_WA^1 * X_WT
-    let tfm_actual = args.robot.fk(q);
-    let tfm_target = args.tfm_target;
-    let tfm_error = tfm_target.inv_mul(&tfm_actual);
-
-    // Minimize the sqaure Euclidean distance of the log pose error. We choose
-    // to use the square distance due to its smoothness.
-    se3::log(&tfm_error).norm_squared()
-}
-
-/// Compute the gradient `g` w.r.t. the local parameterization.
-pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs) {
-    let robot = &args.robot;
-    let tfm_actual = &args.robot.fk(q);
-    let tfm_target = &args.tfm_target;
-
-    match args.config.gradient_mode {
-        GradientMode::Analytical => {
-            // Pose error is computed as in the objective function.
-            let tfm_error = tfm_target.inv_mul(tfm_actual);
-
-            // We compute the Jacobian of our task w.r.t. the joint angles.
-            //
-            // - Jqdot: the local (body-coordinate) frame Jacobian of X w.r.t. q
-            // - Jlog6: the right (body-coordinate) Jacobian of log6(X)
-            // - Jtask: the Jacobian of our pose tracking task
-            //
-            //   Jtask(q) = Jlog6(X) * J(q)
-            let j_qdot = robot.jacobian_local(q);
-            let j_log6 = se3::right_jacobian(&tfm_error);
-            let j_task = j_log6 * j_qdot;
-
-            // We must compute the objective function gradient:
-            //
-            //   ∇h = [ ∂h/∂x1  ...  ∂h/∂xn ]
-            //
-            // Given the pose task Jacobian of the form:
-            //
-            //   J = ⎡ ∂f1/∂x1 ... ∂f1/∂xn ⎤
-            //       ⎢    .           .    ⎥
-            //       ⎢    .           .    ⎥
-            //       ⎣ ∂fm/∂x1 ... ∂fm/∂xn ⎦
-            //
-            // Apply the chain rule to compute the derivative:
-            //
-            //   g = log(X)
-            //   f = || g ||^2
-            //   h' = (f' ∘ g) * g' = (2.0 * log6(X)) * J
-            let fdot_g = 2.0 * se3::log(&tfm_error).transpose();
-            let grad_h = fdot_g * j_task;
-
-            g.copy_from_slice(grad_h.as_slice());
-        }
-        GradientMode::Numerical => {
-            // Central finite difference:
-            //
-            //   ∇h = (f(x + Δx) - f(x - Δx)) / (2 * Δx)
-            let n = q.len();
-            let mut x0 = q.to_vec();
-            let eps = f64::EPSILON.powf(1.0 / 3.0);
-            for i in 0..n {
-                let x0i = x0[i];
-                x0[i] = x0i - eps;
-                let fl = objective(&x0, args);
-                x0[i] = x0i + eps;
-                let fh = objective(&x0, args);
-                g[i] = (fh - fl) / (2.0 * eps);
-                x0[i] = x0i;
             }
         }
     }
