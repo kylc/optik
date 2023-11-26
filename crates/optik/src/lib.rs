@@ -42,7 +42,17 @@ impl Robot {
     }
 
     pub fn from_urdf_file(path: impl AsRef<Path>, base_link: &str, ee_link: &str) -> Self {
-        let chain = Chain::<f64>::from_urdf_file(path).expect("error parsing URDF file!");
+        let urdf = urdf_rs::read_file(path).expect("error parsing URDF file!");
+        Robot::from_urdf(&urdf, base_link, ee_link)
+    }
+
+    pub fn from_urdf_str(urdf: &str, base_link: &str, ee_link: &str) -> Self {
+        let urdf = urdf_rs::read_from_string(urdf).expect("error parsing URDF file!");
+        Robot::from_urdf(&urdf, base_link, ee_link)
+    }
+
+    pub fn from_urdf(urdf: &urdf_rs::Robot, base_link: &str, ee_link: &str) -> Self {
+        let chain = Chain::<f64>::from(urdf);
 
         let base_link = chain
             .find_link(base_link)

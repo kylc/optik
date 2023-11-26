@@ -40,6 +40,19 @@ extern "C" fn optik_robot_from_urdf_file(
 }
 
 #[no_mangle]
+extern "C" fn optik_robot_from_urdf_str(
+    urdf: *const c_char,
+    base_link: *const c_char,
+    ee_link: *const c_char,
+) -> *mut Robot {
+    let urdf = to_str(urdf);
+    let base_link = to_str(base_link);
+    let ee_link = to_str(ee_link);
+
+    Box::into_raw(Box::new(Robot::from_urdf_str(urdf, base_link, ee_link)))
+}
+
+#[no_mangle]
 extern "C" fn optik_robot_free(robot: *mut Robot) {
     unsafe {
         drop(Box::from_raw(robot));

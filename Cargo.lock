@@ -444,6 +444,7 @@ dependencies = [
  "rand_chacha",
  "rayon",
  "slsqp-sys",
+ "urdf-rs",
 ]
 
 [[package]]

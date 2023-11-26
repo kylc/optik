@@ -9,6 +9,9 @@ extern void optik_set_parallelism(unsigned int n);
 extern optik::detail::robot* optik_robot_from_urdf_file(const char* path,
                                                         const char* base_link,
                                                         const char* ee_link);
+extern optik::detail::robot* optik_robot_from_urdf_str(const char* urdf,
+                                                       const char* base_link,
+                                                       const char* ee_link);
 extern void optik_robot_free(optik::detail::robot* robot);
 
 extern unsigned int optik_robot_dof(const optik::detail::robot* robot);
@@ -26,12 +29,22 @@ namespace optik {
 
 void SetParallelism(unsigned int n) { optik_set_parallelism(n); }
 
-Robot::~Robot() { optik_robot_free(inner_); }
+Robot::~Robot() {
+  if (inner_ != nullptr) {
+    optik_robot_free(inner_);
+  }
+}
 
 Robot Robot::FromUrdfFile(const std::string& path, const std::string& base_link,
                           const std::string& ee_link) {
   return optik_robot_from_urdf_file(path.c_str(), base_link.c_str(),
                                     ee_link.c_str());
+}
+
+Robot Robot::FromUrdfStr(const std::string& urdf, const std::string& base_link,
+                         const std::string& ee_link) {
+  return optik_robot_from_urdf_str(urdf.c_str(), base_link.c_str(),
+                                   ee_link.c_str());
 }
 
 Eigen::VectorXd Robot::RandomConfiguration() const noexcept {

@@ -38,7 +38,18 @@ void SetParallelism(unsigned int n);
 
 class Robot final {
  public:
+  Robot(Robot& other) = delete;
+  Robot(Robot&& other) : inner_(std::move(other.inner_)) {
+    other.inner_ = nullptr;
+  };
   ~Robot();
+
+  Robot& operator=(Robot& other) = delete;
+  Robot& operator=(Robot&& other) {
+    inner_ = std::move(other.inner_);
+    other.inner_ = nullptr;
+    return *this;
+  };
 
   //! Load a URDF model file from the given path, and build a chain from the
   //! named base to the named end-effector link.
@@ -48,6 +59,14 @@ class Robot final {
   static Robot FromUrdfFile(const std::string& path,
                             const std::string& base_link,
                             const std::string& ee_link);
+
+  //! See `FromUrdfFile`. Loads the model from an in-memory string.
+  //!
+  //! Panics if the string not contain a valid model file, or if either of the
+  //! links don't exist.
+  static Robot FromUrdfStr(const std::string& urdf,
+                           const std::string& base_link,
+                           const std::string& ee_link);
 
   //! Draw a random generalized position vector from a uniform distribution
   //! subject to the joint limits.
