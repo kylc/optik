@@ -20,17 +20,23 @@ The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization 
 [1]: https://traclabs.com/projects/trac-ik/
 [2]: https://github.com/jacobwilliams/slsqp
 
-## Benchmark
+## Benchmark [^1]
 
-_NOTE: These benchmarks are provisional and conclusions should not yet be drawn._
-
-We compare to TRAC-IK by drawing a random valid joint configuration, mapping into Cartesian space with forward kinematics, and then asking each solver to generate an inverse kinematics solution using a random initial guess.
+We compare to TRAC-IK (via [tracikpy](https://github.com/mjd3/tracikpy)) by drawing a random valid joint configuration, mapping into Cartesian space with forward kinematics, and then asking each solver to generate an inverse kinematics solution using a random initial guess.
 
 Note that this methodology differs from the original TRAC-IK benchmark which solves for configurations along a dense trajectory, meaning seeds are always relatively close. The benchmark shown below is more similar to a motion planning workload, in which samples are randomly drawn from a space with little knowledge of a nearby seed.
 
 Timing is of a single inverse kinematics solve.
 
-<img height="400" src="https://user-images.githubusercontent.com/233860/270505593-cc08ba0d-416f-4288-b48c-83c5ffb0d6d9.png">
+<img height="400" src="https://github.com/kylc/optik/assets/233860/d62b69d8-c2c1-45d8-91aa-24f4c3d98feb">
+
+Additionally, we use the [ik_benchmarking](https://github.com/PickNikRobotics/ik_benchmarking) project (credit to PickNik Robotics) to compare against various solvers for the Franka Emika Panda robot using the MoveIt interfaces for each solver. OptIK is configured to return solutions with roughly equal tolerance to its closest competitor, TRAC-IK.
+
+Timing is of a single inverse kinematics solve. Note the semi-log axes.
+
+<img height="400" src="https://github.com/kylc/optik/assets/233860/2d809bcb-1505-4c6a-bf49-517b351b6ab5">
+
+[^1]: as of https://github.com/kylc/optik/commit/3f324560b1a6ca5cfba2671e0180dd457ea1a28e
 
 ## Setup
 
