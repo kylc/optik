@@ -94,9 +94,11 @@ cmake -DCMAKE_BUILD_TYPE=Release ../examples
 cmake --build .
 ```
 
-## Usage
+## Usage Notes
 
-https://github.com/kylc/optik/blob/4ef93d4bbee9571bb9a7869e73dc8d911ed9079e/examples/example.py#L22-L30
+- For workloads in which the distance between the solution and the seed are not important, you can use a high degree of parallelism (OptIK defaults to the number of CPU cores) to more quickly converge on a solution via parallel random restarting.
+
+- For workloads such as Cartesian interpolation, it is important to find the solution closest to the seed to avoid joint-space discontinuities. While OptIK does not explicitly try to minimize this distance, the optimizer does generally converge to the nearest solution (subject to joint limits). Make sure to disable parallel random restarting (via `optik.set_parallelism(1)` or setting the environmental variable `RAYON_NUM_THREADS=1`) to ensure random seeds aren't used.
 
 ## References
 
