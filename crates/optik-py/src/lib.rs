@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use optik::{GradientMode, Robot, SolutionMode, SolverConfig};
 
-use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion};
+use nalgebra::{Isometry3, Matrix4, Rotation3, Translation3, UnitQuaternion};
 use pyo3::prelude::*;
 
 #[pyfunction]
@@ -113,9 +113,16 @@ impl PyRobot {
             let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
 
             let t = Translation3::from(m.fixed_slice::<3, 1>(0, 3).into_owned());
-            let r = UnitQuaternion::from_matrix(&m.fixed_slice::<3, 3>(0, 0).into_owned());
 
-            Isometry3::from_parts(t, r)
+            // Some rotational gymnastics here to work around an nalgebra bug
+            // (fixed in 0.31) which fails on direct conversion from Matrix3 ->
+            // UnitQuaternion for inputs that are already a rotation matrix.
+            // https://github.com/dimforge/nalgebra/pull/1101
+            let g = m.fixed_slice::<3, 3>(0, 0).into_owned();
+            let r = Rotation3::from_matrix_unchecked(g);
+            let q = UnitQuaternion::from_rotation_matrix(&r);
+
+            Isometry3::from_parts(t, q)
         }
 
         let target = parse_pose(target);
