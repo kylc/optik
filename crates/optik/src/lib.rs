@@ -19,7 +19,7 @@ use rayon::{
 use slsqp_sys::*;
 
 mod config;
-mod math;
+pub mod math;
 
 pub use config::*;
 use math::*;
@@ -183,7 +183,7 @@ impl Robot {
                         |x, g| objective_grad(x, g, &args),
                     ) {
                         IterationResult::Continue => {
-                            x_prev.clone_from_slice(&x);
+                            x_prev.copy_from_slice(&x);
                             f_prev = solver.cost();
 
                             continue;
@@ -242,38 +242,68 @@ pub struct ObjectiveArgs {
     pub tfm_target: Isometry3<f64>,
 }
 
-pub fn objective(x: &[f64], args: &ObjectiveArgs) -> f64 {
-    let tfm_actual = args.robot.fk(x);
+pub fn objective(q: &[f64], args: &ObjectiveArgs) -> f64 {
+    // Compute the pose error w.r.t. the actual pose:
+    //
+    //   X_AT = X_WA^1 * X_WT
+    let tfm_actual = args.robot.fk(q);
     let tfm_target = args.tfm_target;
-    let tfm_error = tfm_target.inverse() * tfm_actual;
+    let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
-    se3::log(tfm_error).norm_squared()
+    // Minimize the sqaure Euclidean distance of the log pose error. We choose
+    // to use the square distance due to its smoothness.
+    se3::log(&tfm_error).norm_squared()
 }
 
-pub fn objective_grad(x: &[f64], g: &mut [f64], args: &ObjectiveArgs) {
+/// Compute the gradient `g` w.r.t. the local parameterization.
+pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs) {
     let robot = &args.robot;
-    let tfm_actual = &args.robot.fk(x);
+    let tfm_actual = &args.robot.fk(q);
     let tfm_target = &args.tfm_target;
 
     match args.config.gradient_mode {
         GradientMode::Analytical => {
+            // Pose error is computed as in the objective function.
             let tfm_error = tfm_target.inv_mul(tfm_actual);
 
-            let j_q = robot.jacobian_local(x);
-            let j_log = se3::right_jacobian(tfm_error);
+            // We compute the Jacobian of our task w.r.t. the joint angles.
+            //
+            // - Jqdot: the local (body-coordinate) frame Jacobian of X w.r.t. q
+            // - Jlog6: the right (body-coordinate) Jacobian of log6(X)
+            // - Jtask: the Jacobian of our pose tracking task
+            //
+            //   Jtask(q) = Jlog6(X) * J(q)
+            let j_qdot = robot.jacobian_local(q);
+            let j_log6 = se3::right_jacobian(&tfm_error);
+            let j_task = j_log6 * j_qdot;
 
-            // Compose the Jacobians to form a linear approximation of the
-            // mapping between joint angles and error in the Lie group of SE(3).
-            // The chain rule says:
-            // J^Z_X = J^Z_Y * J^Y_X
-            let j_log_q = j_log * j_q;
+            // We must compute the objective function gradient:
+            //
+            //   ∇h = [ ∂h/∂x1  ...  ∂h/∂xn ]
+            //
+            // Given the pose task Jacobian of the form:
+            //
+            //   J = ⎡ ∂f1/∂x1 ... ∂f1/∂xn ⎤
+            //       ⎢    .           .    ⎥
+            //       ⎢    .           .    ⎥
+            //       ⎣ ∂fm/∂x1 ... ∂fm/∂xn ⎦
+            //
+            // Apply the chain rule to compute the derivative:
+            //
+            //   g = log(X)
+            //   f = || g ||^2
+            //   h' = (f' ∘ g) * g' = (2.0 * log6(X)) * J
+            let fdot_g = 2.0 * se3::log(&tfm_error).transpose();
+            let grad_h = fdot_g * j_task;
 
-            let grad = 2.0 * j_log_q.transpose() * se3::log(tfm_error);
-            g.copy_from_slice(grad.as_slice());
+            g.copy_from_slice(grad_h.as_slice());
         }
         GradientMode::Numerical => {
-            let n = x.len();
-            let mut x0 = x.to_vec();
+            // Central finite difference:
+            //
+            //   ∇h = (f(x + Δx) - f(x - Δx)) / Δx
+            let n = q.len();
+            let mut x0 = q.to_vec();
             let eps = f64::EPSILON.powf(1.0 / 3.0);
             for i in 0..n {
                 let x0i = x0[i];

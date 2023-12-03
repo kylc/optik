@@ -24,7 +24,11 @@ name = "example"
 path = "../../examples/example.rs"
 
 [dev-dependencies]
+approx = "0.5"
 criterion = "0.5"
+nalgebra = { version = "0.30", features = [ "rand", "serde-serialize" ] }
+serde = "1.0"
+serde_json = "1.0"
 
 [[bench]]
 name = "bench"
