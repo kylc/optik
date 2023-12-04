@@ -104,7 +104,7 @@ impl SlsqpSolver {
     }
 
     pub fn set_tol_f(&mut self, ftol: f64) {
-        self.acc = ftol; // TODO
+        self.acc = 0.1 * ftol; // TODO
         self.tolf = ftol;
     }
 
