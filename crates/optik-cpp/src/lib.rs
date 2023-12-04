@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, c_double, c_uint, CStr},
+    ffi::{c_char, c_double, c_uint, c_ulong, CStr},
     mem,
 };
 
@@ -12,6 +12,7 @@ struct CSolverConfig {
     solution_mode: SolutionMode,
     gradient_mode: GradientMode,
     max_time: c_double,
+    max_restarts: c_ulong,
     tol_f: c_double,
     tol_df: c_double,
     tol_dx: c_double,
@@ -126,6 +127,7 @@ extern "C" fn optik_robot_ik(
             gradient_mode: (*config).gradient_mode,
             solution_mode: (*config).solution_mode,
             max_time: (*config).max_time,
+            max_restarts: (*config).max_restarts,
             tol_f: (*config).tol_f,
             tol_df: (*config).tol_df,
             tol_dx: (*config).tol_dx,

@@ -4,7 +4,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use float_ord::FloatOrd;
@@ -123,30 +123,41 @@ impl Robot {
         tfm_target: &Isometry3<f64>,
         mut x0: Vec<f64>,
     ) -> Option<(Vec<f64>, f64)> {
-        let (lb, ub) = self.joint_limits();
-
         // Project into the joint limits.
+        let (lb, ub) = self.joint_limits();
         for i in 0..self.num_positions() {
             x0[i] = x0[i].clamp(lb[i], ub[i]);
         }
 
-        // Compute the time at which the user-specified timeout will expire. We
-        // will ensure that no solve threads continue iterating beyond this
-        // time.
-        let start_time = Instant::now();
-        let end_time = start_time + Duration::from_secs_f64(config.max_time);
-
         // Fix a global RNG seed, which is used to compute sub-seeds for each thread.
         const RNG_SEED: u64 = 42;
+
+        // Compute the time at which the user-specified timeout will expire. We
+        // will ensure that no solve threads continue iterating beyond this
+        // time. If no max time is specified then run until the retry count is
+        // exhausted.
+        let start_time = Instant::now();
+        let is_timed_out = || {
+            let elapsed_time = Instant::now().duration_since(start_time).as_secs_f64();
+            config.max_time > 0.0 && elapsed_time > config.max_time
+        };
 
         // In SolutionMode::Speed, when one thread finds a solution which
         // satisfies the tolerances, it will immediately tell all of the other
         // threads to exit.
         let should_exit = Arc::new(AtomicBool::new(false));
 
+        // If a maximum number of restarts is specified then we limit to that.
+        // Otherwise, limit to a huge number.
+        let max_restarts = if config.max_restarts > 0 {
+            config.max_restarts
+        } else {
+            u64::MAX
+        };
+
         // Build a parallel stream of solutions from which we can choose how to
         // draw a final result.
-        let solution_stream = (0..u64::MAX)
+        let solution_stream = (0..max_restarts)
             .into_par_iter()
             .map(|i| {
                 let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
@@ -181,7 +192,7 @@ impl Robot {
                 // - The solver converges within the tolerance
                 // - Another thread signals that it has converged
                 // - The timeout expires
-                while !should_exit.load(Ordering::Relaxed) && Instant::now() < end_time {
+                while !should_exit.load(Ordering::Relaxed) && !is_timed_out() {
                     match solver.iterate(
                         &mut x,
                         |x| objective(x, &args),
@@ -223,7 +234,7 @@ impl Robot {
 
                 None
             })
-            .take_any_while(|_| Instant::now() < end_time)
+            .take_any_while(|_| !is_timed_out())
             .flatten();
 
         match config.solution_mode {

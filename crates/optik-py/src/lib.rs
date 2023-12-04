@@ -20,6 +20,7 @@ impl PySolverConfig {
     #[pyo3(signature=(gradient_mode="analytical",
                       solution_mode="speed",
                       max_time=0.1,
+                      max_restarts=u64::MAX,
                       tol_f=1e-6,
                       tol_dx=-1.0,
                       tol_df=-1.0))]
@@ -27,6 +28,7 @@ impl PySolverConfig {
         gradient_mode: &str,
         solution_mode: &str,
         max_time: f64,
+        max_restarts: u64,
         tol_f: f64,
         tol_dx: f64,
         tol_df: f64,
@@ -47,6 +49,7 @@ impl PySolverConfig {
             gradient_mode,
             solution_mode,
             max_time,
+            max_restarts,
             tol_dx,
             tol_f,
             tol_df,
