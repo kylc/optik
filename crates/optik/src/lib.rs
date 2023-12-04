@@ -121,9 +121,14 @@ impl Robot {
         &self,
         config: &SolverConfig,
         tfm_target: &Isometry3<f64>,
-        x0: Vec<f64>,
+        mut x0: Vec<f64>,
     ) -> Option<(Vec<f64>, f64)> {
         let (lb, ub) = self.joint_limits();
+
+        // Project into the joint limits.
+        for i in 0..self.num_positions() {
+            x0[i] = x0[i].clamp(lb[i], ub[i]);
+        }
 
         // Compute the time at which the user-specified timeout will expire. We
         // will ensure that no solve threads continue iterating beyond this
