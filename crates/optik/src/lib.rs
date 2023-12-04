@@ -9,7 +9,7 @@ use std::{
 
 use float_ord::FloatOrd;
 use k::{joint::Range, Chain, SerialChain};
-use nalgebra::{DMatrix, DVector, Isometry3};
+use nalgebra::{DMatrix, DVector, DVectorSlice, Isometry3};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rayon::{
@@ -239,9 +239,15 @@ impl Robot {
 
         match config.solution_mode {
             SolutionMode::Quality => {
-                // Continue solving until the timeout is reached and take the best of all
-                // solutions.
-                solution_stream.min_by_key(|&(_, obj)| FloatOrd(obj))
+                // Continue solving until the timeout is reached and take the
+                // best of all solutions. In this case, the cost of a given
+                // solution is computed as its distance from the seed.
+                solution_stream.min_by_key(|(x, _)| {
+                    let x = DVectorSlice::from_slice(x, self.num_positions());
+                    let x0 = DVectorSlice::from_slice(&x0, self.num_positions());
+
+                    FloatOrd(x.metric_distance(&x0))
+                })
             }
             SolutionMode::Speed => {
                 // Take the first solution which satisfies the tolerance.
