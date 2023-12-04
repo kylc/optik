@@ -24,6 +24,7 @@ struct SolverConfig {
   SolutionMode solution_mode = SolutionMode::kSpeed;
   GradientMode gradient_mode = GradientMode::kAnalytical;
   double max_time = 0.1;
+  unsigned long max_restarts = 0;
   double tol_f = 1e-6;
   double tol_df = -1.0;
   double tol_dx = -1.0;
