@@ -45,6 +45,10 @@ impl PySolverConfig {
             _ => panic!("invalid solution mode"),
         };
 
+        if max_time == 0.0 && max_restarts == 0 {
+            panic!("no time or restart limit applied -- solver would run forever")
+        }
+
         PySolverConfig(SolverConfig {
             gradient_mode,
             solution_mode,
