@@ -323,7 +323,7 @@ pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs) {
         GradientMode::Numerical => {
             // Central finite difference:
             //
-            //   ∇h = (f(x + Δx) - f(x - Δx)) / Δx
+            //   ∇h = (f(x + Δx) - f(x - Δx)) / (2 * Δx)
             let n = q.len();
             let mut x0 = q.to_vec();
             let eps = f64::EPSILON.powf(1.0 / 3.0);

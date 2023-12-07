@@ -8,11 +8,11 @@
     <a href="https://zenodo.org/badge/latestdoi/696468110"><img src="https://zenodo.org/badge/696468110.svg" alt="DOI"></a>
 </p>
 
-A fast inverse kinematics solver for arbitrary serial chains, providing Rust and Python programming interfaces.
+A fast inverse kinematics solver for arbitrary serial chains providing Rust, C++, and Python programming interfaces.
 
 The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization problem is formulated and minimized using an SLSQP solver [[2]]. However, this work differs in a couple of ways:
 
-- The gradient of the objective function is computed analytically. This is an immediate 2x performance improvement over finite difference approaches, because it requires only one evaluation of the forward kinematics as opposed to two (or more).
+- The gradient of the objective function is computed analytically. This is an immediate performance improvement over finite difference approaches, because it requires only one evaluation of the forward kinematics per gradient evaluation.
 - Random restarting of the nonlinear solver is implemented in a work stealing parallel fashion, so that overall solve time is decreased thanks to the improved chance of finding a good seed.
 - Random number generator seeds are carefully controlled in a way that produces deterministic results. (Note that this is only true in single-threaded mode, for now.)
 - A parallel Newton's method solver is **not** included, because the performance of the full nonlinear problem is quite good on its own.
@@ -68,14 +68,6 @@ FetchContent_MakeAvailable(optik)
 target_link_libraries(mylib PRIVATE optik::optik)
 ```
 
-### Rust
-
-Add OptIK as a Cargo dependency:
-
-``` sh
-cargo add optik
-```
-
 ### Building Locally
 
 ``` sh
@@ -94,11 +86,13 @@ cmake -DCMAKE_BUILD_TYPE=Release ../examples
 cmake --build .
 ```
 
-## Usage Notes
+## Application Notes
 
 - For workloads in which the distance between the solution and the seed are not important, you can use a high degree of parallelism (OptIK defaults to the number of CPU cores) to more quickly converge on a solution via parallel random restarting.
 
-- For workloads such as Cartesian interpolation, it is important to find the solution closest to the seed to avoid joint-space discontinuities. While OptIK does not explicitly try to minimize this distance, the optimizer does generally converge to the nearest solution (subject to joint limits). Make sure to disable parallel random restarting (via `optik.set_parallelism(1)` or setting the environmental variable `RAYON_NUM_THREADS=1`) to ensure random seeds aren't used.
+- For workloads such as Cartesian interpolation, it is important to find the solution closest to the seed to avoid joint-space discontinuities. While OptIK does not explicitly try to minimize this distance, the optimizer does generally converge to the nearest solution (subject to joint limits). Prefer using `SolutionMode::Quality` with parallelism to sample many solutions and choose the one nearest the seed.
+
+- For workloads in which determinism is important, consider using `SolutionMode::Quality`, settings a `max_restarts` value, and disabling the `max_time`. This ensures that the solution is not dependent on CPU processing speed. Due to careful seeding of RNGs inside the solver, solutions should be fully deterministic. Alternatively, use `SolutionMode::Speed` and set the parallel threads to `1`.
 
 ## References
 
