@@ -1,17 +1,12 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use k::Chain;
 use nalgebra::Isometry3;
 
 use optik::*;
 
-const BENCHMARK_MODEL_PATH: &str = "../../models/ur3e.urdf";
-const BENCHMARK_MODEL_EE_NAME: &str = "ur_ee_link";
+const BENCH_MODEL_STR: &str = include_str!("../tests/data/ur3e.urdf");
 
 fn load_benchmark_model() -> Robot {
-    let chain = Chain::<f64>::from_urdf_file(BENCHMARK_MODEL_PATH).unwrap();
-    let serial = k::SerialChain::from_end(chain.find_link(BENCHMARK_MODEL_EE_NAME).unwrap());
-
-    Robot::new(serial)
+    Robot::from_urdf_str(BENCH_MODEL_STR, "ur_base_link", "ur_ee_link")
 }
 
 fn bench_jacobian(c: &mut Criterion) {
