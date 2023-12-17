@@ -27,7 +27,7 @@ pub struct SolverConfig {
     /// Set to 0 for no restart limit.
     pub max_restarts: u64,
 
-    /// Stopping criteria: |f(x)| < tol_f
+    /// Stopping criteria: f(x) < tol_f
     pub tol_f: f64,
 
     /// Stopping criteria: |f(x_{n+1}) - f(x)| < tol_df
