@@ -13,8 +13,8 @@ pub fn objective(x: &[f64], args: &ObjectiveArgs, cache: &mut KinematicsCache) -
     // Compute the pose error w.r.t. the actual pose:
     //
     //   X_AT = X_WA^1 * X_WT
-    let frames = cache.get_or_update(&args.robot.joints, x);
-    let tfm_actual = frames.last().unwrap() * args.robot.ee_offset;
+    let frames = cache.get_or_update(&args.robot.chain, x);
+    let tfm_actual = frames.ee_tfm();
     let tfm_target = args.tfm_target;
     let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
@@ -29,10 +29,9 @@ pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs, cache: &mu
 
     match args.config.gradient_mode {
         GradientMode::Analytical => {
-            let frames = cache.get_or_update(&args.robot.joints, q);
-
             // Pose error is computed as in the objective function.
-            let tfm_actual = frames.last().unwrap() * robot.ee_offset;
+            let frames = cache.get_or_update(&args.robot.chain, q);
+            let tfm_actual = frames.ee_tfm();
             let tfm_target = &args.tfm_target;
             let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
@@ -43,6 +42,7 @@ pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs, cache: &mu
             // - Jtask: the Jacobian of our pose tracking task
             //
             //   Jtask(q) = Jlog6(X) * J(q)
+            // let j_qdot = robot.joint_jacobian(frames);
             let j_qdot = robot.joint_jacobian(frames);
             let j_log6 = se3::right_jacobian(&tfm_error);
             let j_task = j_log6 * j_qdot;

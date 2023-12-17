@@ -8,12 +8,12 @@ fn main() {
     let base_name = std::env::args().nth(2).unwrap();
     let ee_name = std::env::args().nth(3).unwrap();
 
-    let chain = k::Chain::<f64>::from_urdf_file(urdf_path).unwrap();
-    let serial = k::SerialChain::from_end_to_root(
-        chain.find_link(&ee_name).unwrap(),
-        chain.find_link(&base_name).unwrap(),
-    );
-    let robot = Robot::new(serial);
+    // let chain = k::Chain::<f64>::from_urdf_file(urdf_path).unwrap();
+    // let serial = k::SerialChain::from_end_to_root(
+    //     chain.find_link(&ee_name).unwrap(),
+    //     chain.find_link(&base_name).unwrap(),
+    // );
+    let robot = Robot::from_urdf_file(urdf_path, &base_name, &ee_name);
 
     let config = SolverConfig::default();
 

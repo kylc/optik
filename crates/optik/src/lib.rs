@@ -8,8 +8,7 @@ use std::{
     time::Instant,
 };
 
-use k::{joint::Range, Chain, JointType, SerialChain};
-use nalgebra::{DVector, DVectorSlice, Isometry3, Matrix6xX};
+use nalgebra::{DVector, DVectorView, Isometry3, Matrix6xX};
 use ordered_float::OrderedFloat;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -17,7 +16,6 @@ use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
-use slsqp_sys::*;
 
 mod config;
 pub mod kinematics;
@@ -27,6 +25,7 @@ pub mod objective;
 pub use config::*;
 use kinematics::*;
 use objective::*;
+use slsqp_sys::{IterationResult, SlsqpSolver};
 
 pub fn set_parallelism(n: usize) {
     ThreadPoolBuilder::new()
@@ -37,37 +36,12 @@ pub fn set_parallelism(n: usize) {
 
 #[derive(Clone)]
 pub struct Robot {
-    chain: SerialChain<f64>,
-    joints: Vec<Joint<f64>>,
-    ee_offset: Isometry3<f64>,
+    chain: KinematicChain,
 }
 
 impl Robot {
-    pub fn new(chain: SerialChain<f64>) -> Self {
-        let mut joints = vec![];
-        let mut fixed_offset = Isometry3::identity();
-        for node in chain.iter() {
-            let joint = node.joint();
-            match joint.joint_type {
-                JointType::Rotational { axis } => {
-                    joints.push(Joint::revolute(joint.origin() * fixed_offset, axis));
-                    fixed_offset = Isometry3::identity();
-                }
-                JointType::Linear { axis } => {
-                    joints.push(Joint::prismatic(joint.origin() * fixed_offset, axis));
-                    fixed_offset = Isometry3::identity();
-                }
-                JointType::Fixed {} => {
-                    fixed_offset *= joint.origin();
-                }
-            }
-        }
-
-        Self {
-            chain,
-            joints,
-            ee_offset: fixed_offset,
-        }
+    pub fn new(chain: KinematicChain) -> Self {
+        Self { chain }
     }
 
     pub fn from_urdf_file(path: impl AsRef<Path>, base_link: &str, ee_link: &str) -> Self {
@@ -81,32 +55,18 @@ impl Robot {
     }
 
     pub fn from_urdf(urdf: &urdf_rs::Robot, base_link: &str, ee_link: &str) -> Self {
-        let chain = Chain::<f64>::from(urdf);
-
-        let base_link = chain
-            .find_link(base_link)
-            .unwrap_or_else(|| panic!("link '{}' does not exist!", base_link));
-        let ee_link = chain
-            .find_link(ee_link)
-            .unwrap_or_else(|| panic!("link '{}' does not exist!", ee_link));
-
-        let serial = SerialChain::from_end_to_root(ee_link, base_link);
-        Robot::new(serial)
+        let chain = KinematicChain::from_urdf(urdf, base_link, ee_link);
+        Robot::new(chain)
     }
+}
 
+impl Robot {
     pub fn num_positions(&self) -> usize {
-        self.joints.len()
+        self.chain.nq()
     }
 
     pub fn joint_limits(&self) -> (DVector<f64>, DVector<f64>) {
-        let unlimited = Range::new(f64::NEG_INFINITY, f64::INFINITY);
-
-        let (lb, ub) = self
-            .chain
-            .iter_joints()
-            .map(|j| j.limits.unwrap_or(unlimited))
-            .map(|l| (l.min, l.max))
-            .unzip();
+        let (lb, ub) = self.chain.joints.iter().map(|j| j.limits).unzip();
 
         (DVector::from_vec(lb), DVector::from_vec(ub))
     }
@@ -118,15 +78,12 @@ impl Robot {
             .collect()
     }
 
-    pub fn joint_jacobian(&self, frames: &[Isometry3<f64>]) -> Matrix6xX<f64> {
-        joint_jacobian(&self.joints, &self.ee_offset, frames)
+    pub fn joint_jacobian(&self, fk: &ForwardKinematics) -> Matrix6xX<f64> {
+        self.chain.joint_jacobian(fk)
     }
 
     pub fn fk(&self, q: &[f64]) -> Isometry3<f64> {
-        joint_kinematics(&self.joints, q)
-            .last()
-            .unwrap_or_else(Isometry3::identity)
-            * self.ee_offset
+        *self.chain.forward_kinematics(q).ee_tfm()
     }
 
     pub fn ik(
@@ -140,9 +97,6 @@ impl Robot {
         for i in 0..self.num_positions() {
             x0[i] = x0[i].clamp(lb[i], ub[i]);
         }
-
-        // Fix a global RNG seed, which is used to compute sub-seeds for each thread.
-        const RNG_SEED: u64 = 42;
 
         // Compute the time at which the user-specified timeout will expire. We
         // will ensure that no solve threads continue iterating beyond this
@@ -169,98 +123,97 @@ impl Robot {
 
         // Build a parallel stream of solutions from which we can choose how to
         // draw a final result.
-        let solution_stream = (0..max_restarts)
-            .into_par_iter()
-            .map(|i| {
-                let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
-                rng.set_stream(i);
+        let solution_stream = (0..max_restarts).into_par_iter().flat_map(|i| {
+            // Fix a global RNG seed, which is used to compute sub-seeds for each thread.
+            const RNG_SEED: u64 = 42;
 
-                let cache = RefCell::new(KinematicsCache::default());
-                let args = ObjectiveArgs {
-                    robot: self,
-                    config,
-                    tfm_target,
-                };
+            let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
+            rng.set_stream(i);
 
-                // The first attempt gets the initial seed provided by the caller.
-                // All other attempts start at some random point.
-                let mut x = if i == 0 {
-                    x0.clone()
-                } else {
-                    self.random_configuration(&mut rng)
-                };
+            let cache = RefCell::new(KinematicsCache::default());
+            let args = ObjectiveArgs {
+                robot: self,
+                config,
+                tfm_target,
+            };
 
-                let mut solver = SlsqpSolver::new(x.len());
-                solver.set_tol_f(config.tol_f);
-                solver.set_tol_df(config.tol_df);
-                solver.set_tol_dx(config.tol_dx);
-                solver.set_lb(lb.as_slice());
-                solver.set_ub(ub.as_slice());
+            // The first attempt gets the initial seed provided by the caller.
+            // All other attempts start at some random point.
+            let mut x = if i == 0 {
+                x0.clone()
+            } else {
+                self.random_configuration(&mut rng)
+            };
 
-                // Bookkeeping for stopping criteria.
-                let mut x_prev = x.clone();
-                let mut f_prev = objective(&x, &args, &mut cache.borrow_mut());
+            let mut solver = SlsqpSolver::new(x.len());
+            solver.set_tol_f(config.tol_f);
+            solver.set_tol_df(config.tol_df);
+            solver.set_tol_dx(config.tol_dx);
+            solver.set_lb(lb.as_slice());
+            solver.set_ub(ub.as_slice());
 
-                // Iterate the solver until any of:
-                // - The solver converges within the active convergence criteria
-                // - Another thread arrives at a solution (in speed mode)
-                // - The specified timeout expires
-                while !should_exit.load(Ordering::Relaxed) && !is_timed_out() {
-                    match solver.iterate(
-                        &mut x,
-                        |x| objective(x, &args, &mut cache.borrow_mut()),
-                        |x, g| objective_grad(x, g, &args, &mut cache.borrow_mut()),
-                    ) {
-                        IterationResult::Continue => {
-                            x_prev.copy_from_slice(&x);
-                            f_prev = solver.cost();
+            // Bookkeeping for stopping criteria.
+            let mut x_prev = x.clone();
+            let mut f_prev = objective(&x, &args, &mut cache.borrow_mut());
 
-                            continue;
-                        }
-                        IterationResult::Converged => {
-                            // The SLSQP solver can report convergence
-                            // regardless of whether our tol_f, tol_df, or
-                            // tol_dx conditions are met. If we verify that this
-                            // solution does meet the criteria then it can be
-                            // returned.
+            // Iterate the solver until any of:
+            // - The solver converges within the active convergence criteria
+            // - Another thread arrives at a solution (in speed mode)
+            // - The specified timeout expires
+            while !should_exit.load(Ordering::Relaxed) && !is_timed_out() {
+                match solver.iterate(
+                    &mut x,
+                    |x| objective(x, &args, &mut cache.borrow_mut()),
+                    |x, g| objective_grad(x, g, &args, &mut cache.borrow_mut()),
+                ) {
+                    IterationResult::Continue => {
+                        x_prev.copy_from_slice(&x);
+                        f_prev = solver.cost();
+
+                        continue;
+                    }
+                    IterationResult::Converged => {
+                        // The SLSQP solver can report convergence
+                        // regardless of whether our tol_f, tol_df, or
+                        // tol_dx conditions are met. If we verify that this
+                        // solution does meet the criteria then it can be
+                        // returned.
+                        //
+                        // This is due to an internal `accuracy` parameter,
+                        // which reports convergence if the change in
+                        // objective function falls below it.
+                        let df = solver.cost() - f_prev;
+                        let dx = DVectorView::from_slice(&x, x.len())
+                            - DVectorView::from_slice(&x_prev, x_prev.len());
+
+                        // Report convergence if _any_ of the active
+                        // convergence criteria are met.
+                        if solver.cost().abs() < config.tol_f
+                            || (config.tol_df > 0.0 && df.abs() < config.tol_df)
+                            || (config.tol_dx > 0.0 && dx.norm().abs() < config.tol_dx)
+                        {
+                            // Short-circuit any other threads for a modest
+                            // performance increase.
                             //
-                            // This is due to an internal `accuracy` parameter,
-                            // which reports convergence if the change in
-                            // objective function falls below it.
-                            let df = solver.cost() - f_prev;
-                            let dx = DVectorSlice::from_slice(&x, x.len())
-                                - DVectorSlice::from_slice(&x_prev, x_prev.len());
-
-                            // Report convergence if _any_ of the active
-                            // convergence criteria are met.
-                            if solver.cost().abs() < config.tol_f
-                                || (config.tol_df > 0.0 && df.abs() < config.tol_df)
-                                || (config.tol_dx > 0.0 && dx.norm().abs() < config.tol_dx)
-                            {
-                                // Short-circuit any other threads for a modest
-                                // performance increase.
-                                //
-                                // In `Speed` mode, if the current thread has
-                                // converged on a satisfactory solution then we
-                                // don't care what the others are going to
-                                // produce.
-                                if config.solution_mode == SolutionMode::Speed {
-                                    should_exit.store(true, Ordering::Relaxed);
-                                }
-
-                                return Some((x, solver.cost()));
+                            // In `Speed` mode, if the current thread has
+                            // converged on a satisfactory solution then we
+                            // don't care what the others are going to
+                            // produce.
+                            if config.solution_mode == SolutionMode::Speed {
+                                should_exit.store(true, Ordering::Relaxed);
                             }
 
-                            return None;
+                            return Some((x, solver.cost()));
                         }
-                        IterationResult::Error => return None,
-                    }
-                }
 
-                None
-            })
-            .take_any_while(|_| !is_timed_out())
-            .flatten();
+                        return None;
+                    }
+                    IterationResult::Error => return None,
+                }
+            }
+
+            None
+        });
 
         match config.solution_mode {
             SolutionMode::Quality => {
@@ -268,8 +221,8 @@ impl Robot {
                 // best of all solutions. In this case, the cost of a given
                 // solution is computed as its distance from the seed.
                 solution_stream.min_by_key(|(x, _)| {
-                    let x = DVectorSlice::from_slice(x, x.len());
-                    let x0 = DVectorSlice::from_slice(&x0, x0.len());
+                    let x = DVectorView::from_slice(x, x.len());
+                    let x0 = DVectorView::from_slice(&x0, x0.len());
 
                     OrderedFloat(x.metric_distance(&x0))
                 })

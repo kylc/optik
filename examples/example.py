@@ -17,7 +17,7 @@ import numpy as np
 from optik import Robot, SolverConfig
 
 robot = Robot.from_urdf_file(*sys.argv[1:4])
-config = SolverConfig()
+config = SolverConfig(tol_f=1e-30)
 
 N = 10000
 
@@ -36,6 +36,14 @@ for i in range(N):
     end = time.time()
 
     if q_opt is not None:
+        target_ee_pose = np.reshape(target_ee_pose, (4, 4))
+        actual_ee_pose = np.reshape(robot.fk(q_opt), (4, 4))
+        print("xyz:", np.linalg.norm(target_ee_pose[0:3, 3] - actual_ee_pose[0:3, 3]))
+        print("rot:", np.linalg.norm(target_ee_pose[0:3, 0:3] - actual_ee_pose[0:3, 0:3]))
+        # print("---")
+        # print(np.reshape(target_ee_pose, (4, 4)))
+        # print(np.reshape(robot.fk(q_opt), (4, 4)))
+
         total_time += end - start
         print("Total time: {}us (to {:.1e})".format(int(1e6 * (end - start)), c))
 

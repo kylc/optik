@@ -196,9 +196,9 @@ pub mod se3 {
         let q = se3::right_jacobian_q_matrix(v, &w);
 
         let mut u = Matrix6::zeros();
-        u.fixed_slice_mut::<3, 3>(0, 0).copy_from(&j);
-        u.fixed_slice_mut::<3, 3>(0, 3).copy_from(&q);
-        u.fixed_slice_mut::<3, 3>(3, 3).copy_from(&j);
+        u.fixed_view_mut::<3, 3>(0, 0).copy_from(&j);
+        u.fixed_view_mut::<3, 3>(0, 3).copy_from(&q);
+        u.fixed_view_mut::<3, 3>(3, 3).copy_from(&j);
         u
     }
 }
