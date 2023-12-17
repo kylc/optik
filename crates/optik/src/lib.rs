@@ -7,9 +7,9 @@ use std::{
     time::Instant,
 };
 
-use float_ord::FloatOrd;
 use k::{joint::Range, Chain, SerialChain};
 use nalgebra::{DMatrix, DVector, DVectorSlice, Isometry3};
+use ordered_float::OrderedFloat;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rayon::{
@@ -246,7 +246,7 @@ impl Robot {
                     let x = DVectorSlice::from_slice(x, self.num_positions());
                     let x0 = DVectorSlice::from_slice(&x0, self.num_positions());
 
-                    FloatOrd(x.metric_distance(&x0))
+                    OrderedFloat(x.metric_distance(&x0))
                 })
             }
             SolutionMode::Speed => {

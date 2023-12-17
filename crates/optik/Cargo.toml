@@ -11,9 +11,9 @@ name = "optik"
 crate-type = ["rlib"]
 
 [dependencies]
-float-ord = "0.3"
 k = "0.31"
 nalgebra = "0.30"
+ordered-float = "4.2"
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.8"

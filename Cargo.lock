@@ -212,12 +212,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "float-ord"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ce81f49ae8a0482e4c55ea62ebbd7e5a686af544c00b9d090bba3ff9be97b3d"
-
-[[package]]
 name = "getrandom"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -449,9 +443,9 @@ version = "0.3.0"
 dependencies = [
  "approx",
  "criterion",
- "float-ord",
  "k",
  "nalgebra",
+ "ordered-float",
  "rand",
  "rand_chacha",
  "rayon",
@@ -478,6 +472,15 @@ dependencies = [
  "optik",
  "pyo3",
  "pyo3-build-config",
+]
+
+[[package]]
+name = "ordered-float"
+version = "4.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a76df7075c7d4d01fdcb46c912dd17fba5b60c78ea480b475f2b6ab6f666584e"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
