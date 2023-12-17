@@ -30,17 +30,18 @@ impl KinematicChain {
             let ee_link_ix = graph
                 .node_indices()
                 .find(|&ix| graph[ix].name == ee_link)
-                .unwrap_or_else(|| panic!("EE link '{}' does not exist", base_link));
+                .unwrap_or_else(|| panic!("EE link '{}' does not exist", ee_link));
 
-            petgraph::algo::astar(
+            let (_dist, path) = petgraph::algo::astar(
                 &graph,
                 base_link_ix,
                 |ix| ix == ee_link_ix,
                 |_| 1.0,
                 |_| 0.0,
             )
-            .expect("no path from base to EE link")
-            .1
+            .expect("no path from base to EE link");
+
+            path
         };
 
         // Identify the serial chain of joints that connects the links of
@@ -52,91 +53,107 @@ impl KinematicChain {
 
         // OPTIMIZATION: Fold fixed joints to avoid recomputing constant offsets
         // on every forward kinematic computation.
-        let joints = joints
-            .scan(Isometry3::identity(), |tfm, joint| match joint.typ {
-                JointType::Fixed => {
-                    // Accumulate the transforms from successive fixed joints.
-                    *tfm = joint.origin * *tfm;
-                    Some(None)
-                }
-                _ => {
-                    // When we encounter a non-fixed joint, apply the
-                    // accumulated fixed joint transforms (if any) and then
-                    // reset the accumulation.
-                    let new_joint = Joint {
-                        origin: joint.origin * *tfm,
-                        ..joint
-                    };
-                    *tfm = Isometry3::identity();
+        let (mut joints, tip_link_tfm) = joints.fold(
+            (vec![], Isometry3::identity()),
+            |(mut joints, collapsed_tfm), joint| {
+                match joint.typ {
+                    JointType::Fixed => {
+                        // Accumulate the transforms from successive fixed joints.
+                        (joints, joint.origin * collapsed_tfm)
+                    }
+                    _ => {
+                        // When we encounter an articulated joint, apply the
+                        // accumulated fixed joint transforms (if any) and then
+                        // reset the accumulation.
+                        let new_joint = Joint {
+                            origin: joint.origin * collapsed_tfm,
+                            ..joint
+                        };
+                        joints.push(new_joint);
 
-                    Some(Some(new_joint))
+                        (joints, Isometry3::identity())
+                    }
                 }
+            },
+        );
+
+        // Handle the case when there is one or more fixed joints hanging off
+        // the articulated chain (e.g. gripper frames).
+        if tip_link_tfm != Isometry3::identity() {
+            joints.push(Joint {
+                name: String::new(),
+                typ: JointType::Fixed,
+                limits: vec![],
+                origin: tip_link_tfm,
             })
-            .flatten();
+        }
 
-        let joints: Vec<Joint> = joints.collect();
+        let chain = Self { joints };
 
         // We don't care to support empty chains.
-        assert!(!joints.is_empty(), "kinematic chain is empty");
+        assert!(chain.num_positions() > 0, "kinematic chain is empty");
 
-        Self { joints }
+        chain
     }
 
-    pub fn nq(&self) -> usize {
+    pub fn num_positions(&self) -> usize {
         self.joints.iter().map(|j| j.typ.nq()).sum()
     }
 
     pub fn forward_kinematics(&self, q: &[f64]) -> ForwardKinematics {
+        let mut fk = ForwardKinematics::default();
+        self.forward_kinematics_mut(q, &mut fk);
+        fk
+    }
+
+    pub fn forward_kinematics_mut(&self, q: &[f64], fk: &mut ForwardKinematics) {
         struct State {
-            qidx: usize,
             tfm: Isometry3<f64>,
+            qidx: usize,
         }
 
-        let joint_tfms: Vec<Isometry3<f64>> = self
-            .joints
-            .iter()
-            .scan(
-                State {
-                    tfm: Isometry3::identity(),
-                    qidx: 0,
-                },
-                |state, joint| {
-                    let qrange = state.qidx..(state.qidx + joint.typ.nq());
-                    let joint_q = &q[qrange];
+        let joint_tfms = self.joints.iter().scan(
+            State {
+                // TODO: Start with None instead if identity to avoid the extra
+                // multiplication operation of I * tfms[0].
+                tfm: Isometry3::identity(),
+                qidx: 0,
+            },
+            |state, joint| {
+                let qrange = state.qidx..(state.qidx + joint.typ.nq());
+                let joint_q = &q[qrange];
 
-                    state.tfm *= joint.origin * joint.typ.local_transform(joint_q);
-                    state.qidx += joint.typ.nq();
+                state.tfm *= joint.origin * joint.typ.local_transform(joint_q);
+                state.qidx += joint.typ.nq();
 
-                    Some(state.tfm)
-                },
-            )
-            .collect();
+                Some(state.tfm)
+            },
+        );
 
-        let ee_tfm = *joint_tfms.last().unwrap();
-        ForwardKinematics { joint_tfms, ee_tfm }
+        fk.joint_tfms.clear();
+        fk.joint_tfms.extend(joint_tfms);
+
+        fk.ee_tfm = *fk.joint_tfms.last().unwrap();
     }
 
     pub fn joint_jacobian(&self, fk: &ForwardKinematics) -> Matrix6xX<f64> {
-        let dof = self.nq();
         let tfm_w_ee = fk.ee_tfm();
 
-        let mut m = Matrix6xX::zeros(dof);
+        let mut m = Matrix6xX::zeros(self.num_positions());
         let mut col = 0;
-        for (i, joint) in self.joints.iter().enumerate() {
-            let tfm_w_i = fk.joint_tfms[i];
-
+        for (joint, tfm_w_i) in self.joints.iter().zip(&fk.joint_tfms) {
             match joint.typ {
                 JointType::Revolute(axis) => {
-                    let a_i = tfm_w_i.rotation * axis;
-                    let dp_i =
-                        a_i.cross(&(tfm_w_ee.translation.vector - tfm_w_i.translation.vector));
+                    let angular = tfm_w_i.rotation * axis;
+                    let linear =
+                        angular.cross(&(tfm_w_ee.translation.vector - tfm_w_i.translation.vector));
 
-                    // in local frame
-                    let a_i = tfm_w_ee.inverse_transform_vector(&a_i);
-                    let dp_i = tfm_w_ee.inverse_transform_vector(&dp_i);
+                    // Rotate into the local joint frame.
+                    let angular_l = tfm_w_ee.inverse_transform_unit_vector(&angular);
+                    let linear_l = tfm_w_ee.inverse_transform_vector(&linear);
 
-                    m.fixed_view_mut::<3, 1>(0, col).copy_from(&dp_i);
-                    m.fixed_view_mut::<3, 1>(3, col).copy_from(&a_i);
+                    m.fixed_view_mut::<3, 1>(0, col).copy_from(&linear_l);
+                    m.fixed_view_mut::<3, 1>(3, col).copy_from(&angular_l);
                 }
                 JointType::Prismatic(_) => todo!(),
                 JointType::Fixed => {}
@@ -160,8 +177,8 @@ impl ForwardKinematics {
         &self.joint_tfms[joint_ix.index()]
     }
 
-    pub fn ee_tfm(&self) -> &Isometry3<f64> {
-        &self.ee_tfm
+    pub fn ee_tfm(&self) -> Isometry3<f64> {
+        self.ee_tfm
     }
 }
 
@@ -169,7 +186,7 @@ impl ForwardKinematics {
 pub struct Joint {
     pub name: String,
     pub typ: JointType,
-    pub limits: (f64, f64),
+    pub limits: Vec<(f64, f64)>,
     pub origin: Isometry3<f64>,
 }
 
@@ -232,7 +249,7 @@ fn parse_urdf(urdf: &urdf_rs::Robot) -> DiGraph<Link, Joint> {
         let child_ix = graph
             .node_indices()
             .find(|&l| graph[l].name == joint.child.link)
-            .unwrap_or_else(|| panic!("joint child link '{}' does not exist", joint.parent.link));
+            .unwrap_or_else(|| panic!("joint child link '{}' does not exist", joint.child.link));
 
         let joint_type = match &joint.joint_type {
             urdf_rs::JointType::Revolute => JointType::Revolute(Unit::new_normalize(
@@ -246,9 +263,9 @@ fn parse_urdf(urdf: &urdf_rs::Robot) -> DiGraph<Link, Joint> {
         };
 
         let limits = if joint.limit.upper - joint.limit.lower > 0.0 {
-            (joint.limit.lower, joint.limit.upper)
+            vec![(joint.limit.lower, joint.limit.upper)]
         } else {
-            (f64::NEG_INFINITY, f64::INFINITY)
+            vec![(f64::NEG_INFINITY, f64::INFINITY)]
         };
         let origin = urdf_to_tfm(&joint.origin);
 
@@ -265,29 +282,4 @@ fn parse_urdf(urdf: &urdf_rs::Robot) -> DiGraph<Link, Joint> {
     }
 
     graph
-}
-
-/// A cache structure which stores the expensive forward kinematics computation
-/// for its respective generalized joint configuration.
-#[derive(Default, Clone)]
-pub struct KinematicsCache {
-    q: Vec<f64>,
-    kinematics: ForwardKinematics,
-}
-
-impl KinematicsCache {
-    /// If a cache entry exists for the given joint configuration vector `q`,
-    /// return that. Otherwise, compute the forward kinematics, replace the the
-    /// cache with the results, and return them.
-    pub fn get_or_update(&mut self, chain: &KinematicChain, q: &[f64]) -> &ForwardKinematics {
-        if self.q != q {
-            // Clear and extend the cached vectors to prevent any allocations.
-            self.q.clear();
-            self.q.extend_from_slice(q);
-
-            self.kinematics = chain.forward_kinematics(q)
-        }
-
-        &self.kinematics
-    }
 }

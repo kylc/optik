@@ -1,6 +1,6 @@
 use nalgebra::Isometry3;
 
-use crate::{kinematics::KinematicsCache, math::se3, GradientMode, Robot, SolverConfig};
+use crate::{kinematics::ForwardKinematics, math::se3, GradientMode, Robot, SolverConfig};
 
 #[derive(Clone)]
 pub struct ObjectiveArgs<'a> {
@@ -9,12 +9,11 @@ pub struct ObjectiveArgs<'a> {
     pub tfm_target: &'a Isometry3<f64>,
 }
 
-pub fn objective(x: &[f64], args: &ObjectiveArgs, cache: &mut KinematicsCache) -> f64 {
+pub fn objective(args: &ObjectiveArgs, fk: &ForwardKinematics) -> f64 {
     // Compute the pose error w.r.t. the actual pose:
     //
     //   X_AT = X_WA^1 * X_WT
-    let frames = cache.get_or_update(&args.robot.chain, x);
-    let tfm_actual = frames.ee_tfm();
+    let tfm_actual = fk.ee_tfm();
     let tfm_target = args.tfm_target;
     let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
@@ -24,14 +23,11 @@ pub fn objective(x: &[f64], args: &ObjectiveArgs, cache: &mut KinematicsCache) -
 }
 
 /// Compute the gradient `g` w.r.t. the local parameterization.
-pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs, cache: &mut KinematicsCache) {
-    let robot = &args.robot;
-
+pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs, fk: &ForwardKinematics) {
     match args.config.gradient_mode {
         GradientMode::Analytical => {
             // Pose error is computed as in the objective function.
-            let frames = cache.get_or_update(&args.robot.chain, q);
-            let tfm_actual = frames.ee_tfm();
+            let tfm_actual = fk.ee_tfm();
             let tfm_target = &args.tfm_target;
             let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
@@ -42,8 +38,7 @@ pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs, cache: &mu
             // - Jtask: the Jacobian of our pose tracking task
             //
             //   Jtask(q) = Jlog6(X) * J(q)
-            // let j_qdot = robot.joint_jacobian(frames);
-            let j_qdot = robot.joint_jacobian(frames);
+            let j_qdot = args.robot.joint_jacobian(fk);
             let j_log6 = se3::right_jacobian(&tfm_error);
             let j_task = j_log6 * j_qdot;
 
@@ -78,9 +73,11 @@ pub fn objective_grad(q: &[f64], g: &mut [f64], args: &ObjectiveArgs, cache: &mu
             for i in 0..n {
                 let x0i = x0[i];
                 x0[i] = x0i - eps;
-                let fl = objective(&x0, args, cache);
+                let fkl = args.robot.fk(&x0);
+                let fl = objective(args, &fkl);
                 x0[i] = x0i + eps;
-                let fh = objective(&x0, args, cache);
+                let fkh = args.robot.fk(&x0);
+                let fh = objective(args, &fkh);
                 g[i] = (fh - fl) / (2.0 * eps);
                 x0[i] = x0i;
             }

@@ -33,7 +33,7 @@ jobs:
           manylinux: auto
           sccache: true
       - name: install built wheel
-        if: ${{ matrix.target }} == 'x86_64-unknown-linux-gnu'
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           pip install optik-py --no-index --find-links dist
           python -c "import optik"

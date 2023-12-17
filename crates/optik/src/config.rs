@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(C)]
 pub enum SolutionMode {
@@ -5,11 +7,35 @@ pub enum SolutionMode {
     Speed = 2,
 }
 
+impl FromStr for SolutionMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "quality" => Ok(SolutionMode::Quality),
+            "speed" => Ok(SolutionMode::Speed),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(C)]
 pub enum GradientMode {
     Analytical = 1,
     Numerical = 2,
+}
+
+impl FromStr for GradientMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "analytical" => Ok(GradientMode::Analytical),
+            "numerical" => Ok(GradientMode::Numerical),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

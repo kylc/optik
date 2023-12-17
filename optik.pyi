@@ -1,7 +1,5 @@
 from typing import Literal
 
-def set_parallelism(n: int) -> None: ...
-
 class SolverConfig:
     def __init__(
         self,
@@ -10,13 +8,14 @@ class SolverConfig:
         max_time: float = ...,
         max_restarts: int = ...,
         tol_f: float = ...,
-        tol_dx: float = ...,
         tol_df: float = ...,
+        tol_dx: float = ...,
     ): ...
 
 class Robot:
     @staticmethod
     def from_urdf_file(path: str, base_link: str, ee_link: str) -> Robot: ...
+    def set_parallelism(self, n: int) -> None: ...
     def num_positions(self) -> int: ...
     def joint_limits(self) -> tuple[list[float], list[float]]: ...
     def fk(self, x: list[float]) -> list[list[float]]: ...

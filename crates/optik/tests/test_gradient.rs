@@ -1,7 +1,6 @@
 use approx::assert_abs_diff_eq;
 use nalgebra::Vector6;
 use optik::{
-    kinematics::KinematicsCache,
     objective::{objective_grad, ObjectiveArgs},
     GradientMode, Robot, SolverConfig,
 };
@@ -17,6 +16,7 @@ fn test_gradient_analytical_vs_numerical() {
     for _ in 0..100 {
         let x0: Vector6<f64> = rng.gen();
         let tfm_target = rng.gen();
+        let fk = robot.fk(x0.as_slice());
 
         // Analytical gradient
         let args = ObjectiveArgs {
@@ -29,12 +29,7 @@ fn test_gradient_analytical_vs_numerical() {
         };
 
         let mut g_a = Vector6::zeros();
-        objective_grad(
-            x0.as_slice(),
-            g_a.as_mut_slice(),
-            &args,
-            &mut KinematicsCache::default(),
-        );
+        objective_grad(x0.as_slice(), g_a.as_mut_slice(), &args, &fk);
 
         // Numerical gradient
         let args = ObjectiveArgs {
@@ -47,12 +42,7 @@ fn test_gradient_analytical_vs_numerical() {
         };
 
         let mut g_n = Vector6::zeros();
-        objective_grad(
-            x0.as_slice(),
-            g_n.as_mut_slice(),
-            &args,
-            &mut KinematicsCache::default(),
-        );
+        objective_grad(x0.as_slice(), g_n.as_mut_slice(), &args, &fk);
 
         assert_abs_diff_eq!(g_a, g_n, epsilon = 1e-6);
     }

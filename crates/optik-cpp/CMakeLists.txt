@@ -29,7 +29,10 @@ add_dependencies(optik optikcpp_build)
 target_include_directories(
   optik PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                $<INSTALL_INTERFACE:include>)
-target_link_libraries(optik PUBLIC Eigen3::Eigen gfortran ${OPTIK_CPP_LIB})
+target_link_libraries(
+  optik
+  PUBLIC Eigen3::Eigen
+  PRIVATE ${OPTIK_CPP_LIB})
 set_property(TARGET optik PROPERTY CXX_STANDARD 11)
 
 add_library(optik::optik ALIAS optik)

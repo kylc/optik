@@ -1,7 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nalgebra::Isometry3;
 
-use optik::kinematics::KinematicsCache;
 use optik::objective::ObjectiveArgs;
 use optik::*;
 
@@ -9,15 +8,6 @@ const BENCH_MODEL_STR: &str = include_str!("../tests/data/ur3e.urdf");
 
 fn load_benchmark_model() -> Robot {
     Robot::from_urdf_str(BENCH_MODEL_STR, "ur_base_link", "ur_ee_link")
-}
-
-fn bench_jacobian(_c: &mut Criterion) {
-    let robot = load_benchmark_model();
-    let _q = robot.random_configuration(&mut rand::thread_rng());
-
-    // c.bench_function("jacobian", |b| {
-    //     b.iter(|| robot.jacobian_local(black_box(&q)))
-    // });
 }
 
 fn bench_gradient(c: &mut Criterion) {
@@ -42,14 +32,8 @@ fn bench_gradient(c: &mut Criterion) {
             },
             ..args.clone()
         };
-        b.iter(|| {
-            objective_grad(
-                black_box(&q),
-                &mut g,
-                &args,
-                &mut KinematicsCache::default(),
-            )
-        })
+        let fk = robot.fk(&q);
+        b.iter(|| objective_grad(black_box(&q), &mut g, &args, &fk))
     });
 
     c.bench_function("gradient_numerical", |b| {
@@ -60,14 +44,8 @@ fn bench_gradient(c: &mut Criterion) {
             },
             ..args.clone()
         };
-        b.iter(|| {
-            objective_grad(
-                black_box(&q),
-                &mut g,
-                &args,
-                &mut KinematicsCache::default(),
-            )
-        })
+        let fk = robot.fk(&q);
+        b.iter(|| objective_grad(black_box(&q), &mut g, &args, &fk))
     });
 }
 
@@ -77,15 +55,29 @@ fn bench_objective(c: &mut Criterion) {
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
+    let fk = robot.fk(&q);
     let tfm_target = Isometry3::identity();
     let args = ObjectiveArgs {
         robot: &robot,
         config: &SolverConfig::default(),
         tfm_target: &tfm_target,
     };
-    c.bench_function("objective", |b| {
-        b.iter(|| objective(black_box(&q), &args, &mut KinematicsCache::default()))
-    });
+    c.bench_function("objective", |b| b.iter(|| objective(&args, &fk)));
+}
+
+fn bench_fk(c: &mut Criterion) {
+    let robot = load_benchmark_model();
+    let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
+
+    c.bench_function("fk", |b| b.iter(|| robot.fk(&x0)));
+}
+
+fn bench_joint_jacobian(c: &mut Criterion) {
+    let robot = load_benchmark_model();
+    let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
+
+    let fk = robot.fk(&x0);
+    c.bench_function("joint_jacobian", |b| b.iter(|| robot.joint_jacobian(&fk)));
 }
 
 fn bench_ik(c: &mut Criterion) {
@@ -93,7 +85,7 @@ fn bench_ik(c: &mut Criterion) {
     let config = SolverConfig::default();
 
     let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
-    let tfm_target = robot.fk(&[-0.1, -0.2, 0.0, -0.3, 0.2, 1.1]);
+    let tfm_target = robot.fk(&[-0.1, -0.2, 0.0, -0.3, 0.2, 1.1]).ee_tfm();
 
     c.bench_function("ik", |b| {
         b.iter(|| robot.ik(&config, black_box(&tfm_target), x0.clone()))
@@ -102,9 +94,10 @@ fn bench_ik(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_jacobian,
     bench_gradient,
     bench_objective,
+    bench_fk,
+    bench_joint_jacobian,
     bench_ik
 );
 criterion_main!(benches);
