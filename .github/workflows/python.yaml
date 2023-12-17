@@ -7,25 +7,19 @@ env:
 
 jobs:
   build_wheels:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64
-          - os: macos-latest
-            target: x86_64
+          - target: x86_64-unknown-linux-gnu
+          - target: x86_64-apple-darwin
+            args: --zig
+          - target: aarch64-apple-darwin
+            args: --zig
 
     steps:
       - name: checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
-      - name: symlink gfortran (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
-          gfortran --version
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v4
         with:
@@ -35,15 +29,11 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist
+          args: ${{ matrix.args }} --release --out dist
           manylinux: auto
           sccache: true
-      - name: delocate wheel (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          pip install delocate
-          delocate-wheel -v dist/*.whl
       - name: install built wheel
+        if: ${{ matrix.target }} == 'x86_64-unknown-linux-gnu'
         run: |
           pip install optik-py --no-index --find-links dist
           python -c "import optik"
