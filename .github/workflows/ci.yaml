@@ -2,6 +2,9 @@ name: ci
 
 on: [push, pull_request]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -34,6 +37,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      - uses: taiki-e/install-action@nextest
       - name: symlink gfortran (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -41,4 +45,4 @@ jobs:
           gfortran --version
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --all
+      - run: cargo nextest run --profile ci --all-targets
