@@ -95,40 +95,40 @@ impl Robot {
         tfm_target: &Isometry3<f64>,
         x0: Vec<f64>,
     ) -> Option<(Vec<f64>, f64)> {
+        // Complain if the provided seed is out side the joint limits. The
+        // solver may be able to handle this, but it seems likely that there is
+        // a bug in the user's program if this occurs and we should notify them.
+        let (lb, ub) = self.joint_limits();
+        if x0.iter().enumerate().any(|(i, q)| *q < lb[i] || *q > ub[i]) {
+            panic!("seed joint position outside of joint limits")
+        }
+
+        // Compute the time at which the user-specified timeout will expire. We
+        // will ensure that no solve threads continue iterating beyond this
+        // time. If no max time is specified then run until the retry count is
+        // exhausted.
+        let start_time = Instant::now();
+        let is_timed_out = || {
+            let elapsed_time = Instant::now().duration_since(start_time).as_secs_f64();
+            config.max_time > 0.0 && elapsed_time > config.max_time
+        };
+
+        // In SolutionMode::Speed, when one thread finds a solution which
+        // satisfies the tolerances, it will immediately tell all of the other
+        // threads to exit.
+        let should_exit = Arc::new(AtomicBool::new(false));
+
+        // If a maximum number of restarts is specified then we limit to that.
+        // Otherwise, limit to a huge number.
+        let max_restarts = if config.max_restarts > 0 {
+            config.max_restarts
+        } else {
+            u64::MAX
+        };
+
+        // Build a parallel stream of solutions from which we can choose how to
+        // draw a final result.
         self.thread_pool.install(|| {
-            // Complain if the provided seed is out side the joint limits. The
-            // solver may be able to handle this, but it seems likely that there is
-            // a bug in the user's program if this occurs and we should notify them.
-            let (lb, ub) = self.joint_limits();
-            if x0.iter().enumerate().any(|(i, q)| *q < lb[i] || *q > ub[i]) {
-                panic!("seed joint position outside of joint limits")
-            }
-
-            // Compute the time at which the user-specified timeout will expire. We
-            // will ensure that no solve threads continue iterating beyond this
-            // time. If no max time is specified then run until the retry count is
-            // exhausted.
-            let start_time = Instant::now();
-            let is_timed_out = || {
-                let elapsed_time = Instant::now().duration_since(start_time).as_secs_f64();
-                config.max_time > 0.0 && elapsed_time > config.max_time
-            };
-
-            // In SolutionMode::Speed, when one thread finds a solution which
-            // satisfies the tolerances, it will immediately tell all of the other
-            // threads to exit.
-            let should_exit = Arc::new(AtomicBool::new(false));
-
-            // If a maximum number of restarts is specified then we limit to that.
-            // Otherwise, limit to a huge number.
-            let max_restarts = if config.max_restarts > 0 {
-                config.max_restarts
-            } else {
-                u64::MAX
-            };
-
-            // Build a parallel stream of solutions from which we can choose how to
-            // draw a final result.
             let solution_stream = (0..max_restarts)
                 .into_par_iter()
                 .panic_fuse()
@@ -157,20 +157,14 @@ impl Robot {
                     // avoid re-allocating memory each objective iteration.
                     let fk_cache = RefCell::new(ForwardKinematics::default());
 
-                    const EXIT_SENTINEL: f64 = 0.0;
                     let mut optimizer = Nlopt::new(
                         Algorithm::Lbfgs,
                         self.num_positions(),
                         |x: &[f64], grad: Option<&mut [f64]>, _: &mut ()| {
-                            // This is a hack to quickly exit this thread's
-                            // minimization routine if another thread has found a
-                            // solution. -inf is certainly below our stopping value,
-                            // so we expect NLopt to stop iteration immediately.
+                            // Early-exit if we are out of time, or if another
+                            // thread has already found a satisfactory solution.
                             if is_timed_out() || should_exit.load(Ordering::Relaxed) {
-                                if let Some(g) = grad {
-                                    g.fill(0.0)
-                                }
-                                return EXIT_SENTINEL;
+                                return None;
                             }
 
                             let mut fk = fk_cache.borrow_mut();
@@ -186,7 +180,7 @@ impl Robot {
                             }
 
                             // Always compute the objective value.
-                            objective(&args, &fk)
+                            Some(objective(&args, &fk))
                         },
                         Target::Minimize,
                         (),
@@ -197,10 +191,6 @@ impl Robot {
                     optimizer.set_xtol_abs1(config.tol_dx).unwrap();
                     optimizer.set_lower_bounds(lb.as_slice()).unwrap();
                     optimizer.set_upper_bounds(ub.as_slice()).unwrap();
-
-                    // let end_time = start_time + Duration::from_secs_f64(config.max_time);
-                    // let time_reamining = end_time.duration_since(Instant::now());
-                    // optimizer.set_maxtime(time_reamining.as_secs_f64()).unwrap();
 
                     // LBFGS memory size is chosen empirically. This value seems to
                     // give the best performance for ~6 DoF robot arms.
@@ -217,11 +207,6 @@ impl Robot {
                             && matches!(r, SuccessState::StopValReached))
                             || (config.tol_df >= 0. && matches!(r, SuccessState::FtolReached))
                             || (config.tol_dx >= 0. && matches!(r, SuccessState::XtolReached));
-
-                        // Make sure this thread didn't exit with the sentinel "early
-                        // exit" value, which would mean its solution is invalid and
-                        // should be ignored.
-                        let success = success && c != EXIT_SENTINEL;
 
                         if success {
                             if config.solution_mode == SolutionMode::Speed {

@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 nalgebra = "0.32"
-nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "dont-specify-cxx" }
+nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"
 petgraph = "0.6"
 rand = "0.8"

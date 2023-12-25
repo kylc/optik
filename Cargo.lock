@@ -418,7 +418,7 @@ dependencies = [
 [[package]]
 name = "nlopt"
 version = "0.7.0"
-source = "git+https://github.com/kylc/rust-nlopt.git?branch=dont-specify-cxx#60268a3098ec640e5a9dafaf315d72e9380a6b49"
+source = "git+https://github.com/kylc/rust-nlopt.git?branch=optik-patches#3e5c27cc064893494e1d35987d97187ea15ef55f"
 dependencies = [
  "cmake",
 ]
