@@ -36,7 +36,7 @@ impl Robot {
     pub fn new(chain: KinematicChain) -> Self {
         Self {
             chain,
-            thread_pool: ThreadPoolBuilder::new().build().unwrap(),
+            thread_pool: ThreadPoolBuilder::default().build().unwrap(),
         }
     }
 
@@ -58,7 +58,11 @@ impl Robot {
 
 impl Robot {
     pub fn set_parallelism(&mut self, n: usize) {
-        self.thread_pool = ThreadPoolBuilder::new().num_threads(n).build().unwrap()
+        // Don't rebuild the thread pool (an expensive operation) unless this
+        // value has actually changed.
+        if n != self.thread_pool.current_num_threads() {
+            self.thread_pool = ThreadPoolBuilder::new().num_threads(n).build().unwrap()
+        }
     }
 
     pub fn num_positions(&self) -> usize {
@@ -126,6 +130,12 @@ impl Robot {
             u64::MAX
         };
 
+        let args = ObjectiveArgs {
+            robot: self,
+            config,
+            tfm_target,
+        };
+
         // Build a parallel stream of solutions from which we can choose how to
         // draw a final result.
         self.thread_pool.install(|| {
@@ -133,26 +143,6 @@ impl Robot {
                 .into_par_iter()
                 .panic_fuse()
                 .map(|i| {
-                    // Fix a global RNG seed, which is used to compute sub-seeds for
-                    // each thread.
-                    const RNG_SEED: u64 = 42;
-                    let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
-                    rng.set_stream(i);
-
-                    let args = ObjectiveArgs {
-                        robot: self,
-                        config,
-                        tfm_target,
-                    };
-
-                    // The first attempt gets the initial seed provided by the caller.
-                    // All other attempts start at some random point.
-                    let mut x = if i == 0 {
-                        x0.clone()
-                    } else {
-                        self.random_configuration(&mut rng)
-                    };
-
                     // Cache the forward kinematic container within each thread to
                     // avoid re-allocating memory each objective iteration.
                     let fk_cache = RefCell::new(ForwardKinematics::default());
@@ -199,7 +189,21 @@ impl Robot {
                         .set_vector_storage(Some(LBFGS_STORAGE_SIZE))
                         .unwrap();
 
-                    optimizer.optimize(&mut x).ok().and_then(|(r, c)| {
+                    // Fix a global RNG seed, which is used to compute sub-seeds for
+                    // each thread.
+                    const RNG_SEED: u64 = 42;
+                    let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
+                    rng.set_stream(i as u64);
+
+                    // The first attempt gets the initial seed provided by the caller.
+                    // All other attempts start at some random point.
+                    let mut x = if i == 0 {
+                        x0.clone()
+                    } else {
+                        self.random_configuration(&mut rng)
+                    };
+
+                    if let Some((r, c)) = optimizer.optimize(&mut x).ok() {
                         // Make sure that we exited for the right reasons. For example,
                         // NLopt considers a timeout to be a success but we treat it as
                         // a failure.
@@ -213,13 +217,15 @@ impl Robot {
                                 should_exit.store(true, Ordering::Relaxed);
                             }
 
-                            Some((x, c))
-                        } else {
-                            None
+                            return Some((x, c));
                         }
-                    })
+                    }
+
+                    None
                 })
+                // Stop issuing new solve requests once we run out of time.
                 .take_any_while(|_| !is_timed_out())
+                // Ignore failed solve attemps.
                 .flatten();
 
             match config.solution_mode {

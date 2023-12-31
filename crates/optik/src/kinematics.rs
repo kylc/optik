@@ -51,8 +51,16 @@ impl KinematicChain {
             graph[joint].clone()
         });
 
-        // OPTIMIZATION: Fold fixed joints to avoid recomputing constant offsets
-        // on every forward kinematic computation.
+        // OPTIMIZATION: Fold fixed joints to avoid recomputing their constant
+        // offsets on every forward kinematic computation.
+        //
+        // For example, the following kinematic chain can be simplified in such
+        // a way that returns equivalent kinematics:
+        //
+        // original:   (revolute A -> fixed B -> fixed C -> revolute D)
+        // simplified: (revolute A -> revolute D')
+        //
+        // where D' = D * C * B
         let (mut joints, tip_link_tfm) = joints.fold(
             (vec![], Isometry3::identity()),
             |(mut joints, collapsed_tfm), joint| {
@@ -78,7 +86,7 @@ impl KinematicChain {
         );
 
         // Handle the case when there is one or more fixed joints hanging off
-        // the articulated chain (e.g. gripper frames).
+        // the articulated chain (e.g. a gripper frame).
         if tip_link_tfm != Isometry3::identity() {
             joints.push(Joint {
                 name: String::new(),
@@ -96,17 +104,31 @@ impl KinematicChain {
         chain
     }
 
+    /// Returns the size of the generalized position vector for this chain.
     pub fn num_positions(&self) -> usize {
         self.joints.iter().map(|j| j.typ.nq()).sum()
     }
 
+    /// Computes the forward kinematics of this kinematic chain at the
+    /// generalized position vector `q`.
+    ///
+    /// Panics of `q.len() != self.num_positions()`.
     pub fn forward_kinematics(&self, q: &[f64]) -> ForwardKinematics {
-        let mut fk = ForwardKinematics::default();
+        let mut fk = ForwardKinematics::empty();
         self.forward_kinematics_mut(q, &mut fk);
         fk
     }
 
+    /// Like [`forward_kinematics()`], but mutate the given result in-place.
     pub fn forward_kinematics_mut(&self, q: &[f64], fk: &mut ForwardKinematics) {
+        assert_eq!(
+            q.len(),
+            self.num_positions(),
+            "generalized position vector `q` is of incorrect length"
+        );
+
+        // To compute the forward kinematics, we scan across the ordered joints
+        // accumulating the joint transforms.
         struct State {
             tfm: Isometry3<f64>,
             qidx: usize,
@@ -155,8 +177,11 @@ impl KinematicChain {
                     m.fixed_view_mut::<3, 1>(0, col).copy_from(&linear_l);
                     m.fixed_view_mut::<3, 1>(3, col).copy_from(&angular_l);
                 }
-                JointType::Prismatic(_) => todo!(),
-                JointType::Fixed => {}
+                JointType::Prismatic(_) => todo!("prismatic joints not yet supported"),
+                JointType::Fixed => {
+                    // Fixed joint contribution is already accounted for in
+                    // `tfm_w_ee`.
+                }
             };
 
             col += joint.typ.nq();
@@ -173,6 +198,10 @@ pub struct ForwardKinematics {
 }
 
 impl ForwardKinematics {
+    pub fn empty() -> ForwardKinematics {
+        ForwardKinematics::default()
+    }
+
     pub fn joint_tfm(&self, joint_ix: EdgeIndex) -> &Isometry3<f64> {
         &self.joint_tfms[joint_ix.index()]
     }
