@@ -16,7 +16,9 @@ import time
 import numpy as np
 from optik import Robot, SolverConfig
 
-robot = Robot.from_urdf_file(*sys.argv[1:4])
+urdf_path, base_name, ee_name = sys.argv[1:4]
+
+robot = Robot.from_urdf_file(urdf_path, base_name, ee_name)
 config = SolverConfig()
 
 N = 10000
