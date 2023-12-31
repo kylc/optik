@@ -172,8 +172,8 @@ impl Robot {
                             // objective function evaluations, when possible.
                             self.chain.forward_kinematics_mut(x, fk);
 
-                            // Compute the gradient only if it was requested by the
-                            // optimizer.
+                            // Compute the gradient only if it was requested by
+                            // the optimizer.
                             if let Some(g) = grad {
                                 objective_grad(g, &args, &fk);
                             }
@@ -194,21 +194,21 @@ impl Robot {
                     optimizer.set_lower_bounds(lb.as_slice()).unwrap();
                     optimizer.set_upper_bounds(ub.as_slice()).unwrap();
 
-                    // LBFGS memory size is chosen empirically. This value seems to
-                    // give the best performance for ~6 DoF robot arms.
+                    // LBFGS memory size is chosen empirically. This value seems
+                    // to give the best performance for ~6 DoF robot arms.
                     const LBFGS_STORAGE_SIZE: usize = 10;
                     optimizer
                         .set_vector_storage(Some(LBFGS_STORAGE_SIZE))
                         .unwrap();
 
-                    // Fix a global RNG seed, which is used to compute sub-seeds for
-                    // each thread.
+                    // Fix a global RNG seed, which is used to compute sub-seeds
+                    // for each thread.
                     const RNG_SEED: u64 = 42;
                     let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
                     rng.set_stream(i as u64);
 
-                    // The first attempt gets the initial seed provided by the caller.
-                    // All other attempts start at some random point.
+                    // The first attempt gets the initial seed provided by the
+                    // caller.  All other attempts start at some random point.
                     let mut x = if i == 0 {
                         x0.clone()
                     } else {
@@ -216,9 +216,9 @@ impl Robot {
                     };
 
                     if let Some((r, c)) = optimizer.optimize(&mut x).ok() {
-                        // Make sure that we exited for the right reasons. For example,
-                        // NLopt considers a timeout to be a success but we treat it as
-                        // a failure.
+                        // Make sure that we exited for the right reasons. For
+                        // example, NLopt considers a timeout to be a success
+                        // but we treat it as a failure.
                         let success = (config.tol_f >= 0.
                             && matches!(r, SuccessState::StopValReached))
                             || (config.tol_df >= 0. && matches!(r, SuccessState::FtolReached))
@@ -242,9 +242,9 @@ impl Robot {
 
             match config.solution_mode {
                 SolutionMode::Quality => {
-                    // Continue solving until the timeout is reached and take the
-                    // best of all solutions. In this case, the cost of a given
-                    // solution is computed as its distance from the seed.
+                    // Continue solving until the timeout is reached and take
+                    // the best of all solutions. In this case, the cost of a
+                    // given solution is computed as its distance from the seed.
                     solution_stream.min_by_key(|(x, _)| {
                         let x = DVectorView::from_slice(x, x.len());
                         let x0 = DVectorView::from_slice(&x0, x0.len());
