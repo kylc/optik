@@ -110,44 +110,37 @@ fn test_solution_forward_backward() {
     }
 }
 
-// #[test]
-// fn test_solution_quality() {
-//     let robot = Robot::from_urdf_str(TEST_MODEL_STR, "ur_base_link", "ur_ee_link");
+#[test]
+fn test_solution_quality() {
+    let robot = Robot::from_urdf_str(TEST_MODEL_STR, "ur_base_link", "ur_ee_link");
 
-//     let mut rng = StdRng::seed_from_u64(42);
+    let mut rng = StdRng::seed_from_u64(42);
 
-//     let config_speed = SolverConfig {
-//         solution_mode: SolutionMode::Speed,
-//         max_time: 0.05,
-//         ..Default::default()
-//     };
-//     let config_quality = SolverConfig {
-//         solution_mode: SolutionMode::Quality,
-//         ..config_speed
-//     };
+    let config_speed = SolverConfig {
+        solution_mode: SolutionMode::Speed,
+        max_time: 0.0,
+        max_restarts: 15,
+        ..Default::default()
+    };
+    let config_quality = SolverConfig {
+        solution_mode: SolutionMode::Quality,
+        ..config_speed
+    };
 
-//     for _ in 0..20 {
-//         let x0 = DVector::from(vec![0.0; robot.num_positions()]);
-//         let x_target: Vector6<f64> = rng.gen();
-//         let tfm_target = robot.fk(x_target.as_slice()).ee_tfm();
+    for _ in 0..20 {
+        let x0 = vec![0.0; robot.num_positions()];
+        let x_target: Vector6<f64> = rng.gen();
+        let tfm_target = robot.fk(x_target.as_slice()).ee_tfm();
 
-//         let sol_speed = DVector::from(
-//             robot
-//                 .ik(&config_speed, &tfm_target, vec![0.0; robot.num_positions()])
-//                 .unwrap()
-//                 .0,
-//         );
-//         let sol_quality = DVector::from(
-//             robot
-//                 .ik(
-//                     &config_quality,
-//                     &tfm_target,
-//                     vec![0.0; robot.num_positions()],
-//                 )
-//                 .unwrap()
-//                 .0,
-//         );
+        let sol_speed = DVector::from(robot.ik(&config_speed, &tfm_target, x0.clone()).unwrap().0);
+        let sol_quality = DVector::from(
+            robot
+                .ik(&config_quality, &tfm_target, x0.clone())
+                .unwrap()
+                .0,
+        );
 
-//         assert!(sol_quality.metric_distance(&x0) <= sol_speed.metric_distance(&x0));
-//     }
-// }
+        let x0 = DVector::from_row_slice(x0.as_slice());
+        assert!(sol_quality.metric_distance(&x0) <= sol_speed.metric_distance(&x0));
+    }
+}
