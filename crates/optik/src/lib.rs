@@ -72,8 +72,7 @@ impl Robot {
         self.chain
             .joints
             .iter()
-            .map(|j| j.limits.clone())
-            .flatten()
+            .flat_map(|j| j.limits.clone())
             .unzip()
     }
 
@@ -145,12 +144,6 @@ impl Robot {
             1e-3 * config.tol_f
         };
 
-        let args = ObjectiveArgs {
-            robot: self,
-            config,
-            tfm_target,
-        };
-
         // Build a parallel stream of solutions from which we can choose how to
         // draw a final result.
         self.thread_pool.install(|| {
@@ -175,11 +168,11 @@ impl Robot {
                             // Compute the gradient only if it was requested by
                             // the optimizer.
                             if let Some(g) = grad {
-                                objective_grad(g, &args, &fk);
+                                objective_grad(self, tfm_target, fk, g);
                             }
 
                             // Always compute the objective value.
-                            Some(objective(&args, &fk))
+                            Some(objective(self, tfm_target, fk))
                         },
                         Target::Minimize,
                         // Cache the forward kinematic container within each
@@ -205,7 +198,7 @@ impl Robot {
                     // for each thread.
                     const RNG_SEED: u64 = 42;
                     let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
-                    rng.set_stream(i as u64);
+                    rng.set_stream(i);
 
                     // The first attempt gets the initial seed provided by the
                     // caller.  All other attempts start at some random point.
@@ -215,7 +208,7 @@ impl Robot {
                         self.random_configuration(&mut rng)
                     };
 
-                    if let Some((r, c)) = optimizer.optimize(&mut x).ok() {
+                    if let Ok((r, c)) = optimizer.optimize(&mut x) {
                         // Make sure that we exited for the right reasons. For
                         // example, NLopt considers a timeout to be a success
                         // but we treat it as a failure.

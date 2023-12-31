@@ -6,7 +6,7 @@ use rand::{rngs::StdRng, SeedableRng};
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     let robot = if let Some([urdf_path, base_name, ee_name]) = args.get(1..4) {
-        Robot::from_urdf_file(urdf_path, &base_name, &ee_name)
+        Robot::from_urdf_file(urdf_path, base_name, ee_name)
     } else {
         eprintln!("Usage: example <my_robot.urdf> <base_link> <ee_link>");
         process::exit(1);

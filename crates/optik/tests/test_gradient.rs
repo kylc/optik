@@ -1,8 +1,8 @@
 use approx::assert_abs_diff_eq;
 use nalgebra::{DVector, Vector6};
 use optik::{
-    objective::{objective, objective_grad, ObjectiveArgs},
-    Robot, SolverConfig,
+    objective::{objective, objective_grad},
+    Robot,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -42,20 +42,14 @@ fn test_gradient_analytical_vs_numerical() {
         let fk = robot.fk(x0.as_slice());
 
         // Analytical gradient
-        let args = ObjectiveArgs {
-            robot: &robot,
-            config: &SolverConfig::default(),
-            tfm_target: &tfm_target,
-        };
-
         let mut g_a = Vector6::zeros();
-        objective_grad(g_a.as_mut_slice(), &args, &fk);
+        objective_grad(&robot, &tfm_target, &fk, g_a.as_mut_slice());
 
         // Numerical gradient
         let g_n = finite_difference(
             |x| {
                 let fk = robot.fk(x);
-                objective(&args, &fk)
+                objective(&robot, &tfm_target, &fk)
             },
             x0.as_slice(),
         );

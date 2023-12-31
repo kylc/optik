@@ -29,8 +29,10 @@ fn test_stopping_maxtime() {
     let tfm_target = Isometry3::translation(100.0, 100.0, 100.0); // impossible goal
     let x0 = vec![0.0; 6];
 
-    let mut config = SolverConfig::default();
-    config.max_time = MAX_TIME;
+    let config = SolverConfig {
+        max_time: MAX_TIME,
+        ..Default::default()
+    };
 
     let start = Instant::now();
     robot.ik(&config, &tfm_target, x0);

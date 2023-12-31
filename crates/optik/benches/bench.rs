@@ -1,7 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nalgebra::Isometry3;
 
-use optik::objective::ObjectiveArgs;
 use optik::*;
 
 const BENCH_MODEL_STR: &str = include_str!("../tests/data/ur3e.urdf");
@@ -18,15 +17,10 @@ fn bench_gradient(c: &mut Criterion) {
     let q = robot.random_configuration(&mut rand::thread_rng());
     let mut g = vec![0.0; q.len()];
     let tfm_target = Isometry3::identity();
-    let args = ObjectiveArgs {
-        robot: &robot,
-        config: &SolverConfig::default(),
-        tfm_target: &tfm_target,
-    };
 
     c.bench_function("gradient", |b| {
         let fk = robot.fk(&q);
-        b.iter(|| objective_grad(&mut g, &args, &fk))
+        b.iter(|| objective_grad(&robot, &tfm_target, &fk, &mut g))
     });
 }
 
@@ -38,12 +32,9 @@ fn bench_objective(c: &mut Criterion) {
     let q = robot.random_configuration(&mut rand::thread_rng());
     let fk = robot.fk(&q);
     let tfm_target = Isometry3::identity();
-    let args = ObjectiveArgs {
-        robot: &robot,
-        config: &SolverConfig::default(),
-        tfm_target: &tfm_target,
-    };
-    c.bench_function("objective", |b| b.iter(|| objective(&args, &fk)));
+    c.bench_function("objective", |b| {
+        b.iter(|| objective(&robot, &tfm_target, &fk))
+    });
 }
 
 fn bench_fk(c: &mut Criterion) {

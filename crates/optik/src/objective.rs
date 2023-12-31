@@ -1,20 +1,12 @@
 use nalgebra::Isometry3;
 
-use crate::{kinematics::ForwardKinematics, math::se3, Robot, SolverConfig};
+use crate::{kinematics::ForwardKinematics, math::se3, Robot};
 
-#[derive(Clone)]
-pub struct ObjectiveArgs<'a> {
-    pub robot: &'a Robot,
-    pub config: &'a SolverConfig,
-    pub tfm_target: &'a Isometry3<f64>,
-}
-
-pub fn objective(args: &ObjectiveArgs, fk: &ForwardKinematics) -> f64 {
+pub fn objective(_robot: &Robot, tfm_target: &Isometry3<f64>, fk: &ForwardKinematics) -> f64 {
     // Compute the pose error w.r.t. the actual pose:
     //
     //   X_AT = X_WA^1 * X_WT
     let tfm_actual = fk.ee_tfm();
-    let tfm_target = args.tfm_target;
     let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
     // Minimize the sqaure Euclidean distance of the log pose error. We choose
@@ -23,10 +15,14 @@ pub fn objective(args: &ObjectiveArgs, fk: &ForwardKinematics) -> f64 {
 }
 
 /// Compute the gradient `g` w.r.t. the local parameterization.
-pub fn objective_grad(g: &mut [f64], args: &ObjectiveArgs, fk: &ForwardKinematics) {
+pub fn objective_grad(
+    robot: &Robot,
+    tfm_target: &Isometry3<f64>,
+    fk: &ForwardKinematics,
+    g: &mut [f64],
+) {
     // Pose error is computed as in the objective function.
     let tfm_actual = fk.ee_tfm();
-    let tfm_target = &args.tfm_target;
     let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
     // We compute the Jacobian of our task w.r.t. the joint angles.
@@ -36,7 +32,7 @@ pub fn objective_grad(g: &mut [f64], args: &ObjectiveArgs, fk: &ForwardKinematic
     // - Jtask: the Jacobian of our pose tracking task
     //
     //   Jtask(q) = Jlog6(X) * J(q)
-    let j_qdot = args.robot.joint_jacobian(fk);
+    let j_qdot = robot.joint_jacobian(fk);
     let j_log6 = se3::right_jacobian(&tfm_error);
     let j_task = j_log6 * j_qdot;
 
