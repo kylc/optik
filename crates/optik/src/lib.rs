@@ -129,6 +129,22 @@ impl Robot {
             u64::MAX
         };
 
+        // HEURISTIC: Establish an artifical stopping criteria if the
+        // optimization seems to have stalled. This case will not be considered
+        // a successful result, but it will free up this thread to restart from
+        // another seed.
+        let tol_df = if config.tol_df > 0.0 {
+            config.tol_df
+        } else {
+            // Stop when the gradient is a few orders of magnitude smaller than
+            // the requested precision. When this happens, the optimization is
+            // most likely stuck in a local minimum.
+            //
+            // We can't make this too big w.r.t. tol_f or we will exit in cases
+            // that are still on track to converge to a valid solution.
+            1e-3 * config.tol_f
+        };
+
         let args = ObjectiveArgs {
             robot: self,
             config,
@@ -173,7 +189,7 @@ impl Robot {
                     );
 
                     optimizer.set_stopval(config.tol_f).unwrap();
-                    optimizer.set_ftol_abs(config.tol_df).unwrap();
+                    optimizer.set_ftol_abs(tol_df).unwrap();
                     optimizer.set_xtol_abs1(config.tol_dx).unwrap();
                     optimizer.set_lower_bounds(lb.as_slice()).unwrap();
                     optimizer.set_upper_bounds(ub.as_slice()).unwrap();
