@@ -166,7 +166,7 @@ impl Robot {
                             // Compute the gradient only if it was requested by the
                             // optimizer.
                             if let Some(g) = grad {
-                                objective_grad(x, g, &args, &fk);
+                                objective_grad(g, &args, &fk);
                             }
 
                             // Always compute the objective value.

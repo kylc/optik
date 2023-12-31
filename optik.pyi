@@ -3,7 +3,6 @@ from typing import Literal
 class SolverConfig:
     def __init__(
         self,
-        gradient_mode: Literal["numerical", "analytical"] = ...,
         solution_mode: Literal["speed", "quality"] = ...,
         max_time: float = ...,
         max_restarts: int = ...,

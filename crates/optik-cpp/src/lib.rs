@@ -5,11 +5,10 @@ use std::{
 
 use nalgebra::{DMatrix, Isometry3, Translation3, UnitQuaternion};
 
-use optik::{GradientMode, Robot, SolutionMode, SolverConfig};
+use optik::{Robot, SolutionMode, SolverConfig};
 
 #[repr(C)]
 struct CSolverConfig {
-    gradient_mode: GradientMode,
     solution_mode: SolutionMode,
     max_time: c_double,
     max_restarts: c_ulong,
@@ -127,7 +126,6 @@ extern "C" fn optik_robot_ik(
         let ee_pose = Isometry3::from_parts(t, r);
 
         let config = SolverConfig {
-            gradient_mode: (*config).gradient_mode,
             solution_mode: (*config).solution_mode,
             max_time: (*config).max_time,
             max_restarts: (*config).max_restarts,

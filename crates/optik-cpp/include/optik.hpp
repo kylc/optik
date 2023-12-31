@@ -15,13 +15,7 @@ enum class SolutionMode {
   kSpeed = 2,
 };
 
-enum class GradientMode {
-  kAnalytical = 1,
-  kNumerical = 2,
-};
-
 struct SolverConfig {
-  GradientMode gradient_mode = GradientMode::kAnalytical;
   SolutionMode solution_mode = SolutionMode::kSpeed;
   double max_time = 0.1;
   unsigned long max_restarts = 0;

@@ -24,28 +24,9 @@ fn bench_gradient(c: &mut Criterion) {
         tfm_target: &tfm_target,
     };
 
-    c.bench_function("gradient_analytical", |b| {
-        let args = ObjectiveArgs {
-            config: &SolverConfig {
-                gradient_mode: GradientMode::Analytical,
-                ..*args.config
-            },
-            ..args.clone()
-        };
+    c.bench_function("gradient", |b| {
         let fk = robot.fk(&q);
-        b.iter(|| objective_grad(black_box(&q), &mut g, &args, &fk))
-    });
-
-    c.bench_function("gradient_numerical", |b| {
-        let args = ObjectiveArgs {
-            config: &SolverConfig {
-                gradient_mode: GradientMode::Numerical,
-                ..*args.config
-            },
-            ..args.clone()
-        };
-        let fk = robot.fk(&q);
-        b.iter(|| objective_grad(black_box(&q), &mut g, &args, &fk))
+        b.iter(|| objective_grad(&mut g, &args, &fk))
     });
 }
 

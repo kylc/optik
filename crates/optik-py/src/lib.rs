@@ -10,15 +10,13 @@ struct PySolverConfig(SolverConfig);
 #[pymethods]
 impl PySolverConfig {
     #[new]
-    #[pyo3(signature=(gradient_mode="analytical",
-                      solution_mode="speed",
+    #[pyo3(signature=(solution_mode="speed",
                       max_time=0.1,
                       max_restarts=u64::MAX,
                       tol_f=1e-6,
                       tol_df=-1.0,
                       tol_dx=-1.0))]
     fn py_new(
-        gradient_mode: &str,
         solution_mode: &str,
         max_time: f64,
         max_restarts: u64,
@@ -26,7 +24,6 @@ impl PySolverConfig {
         tol_df: f64,
         tol_dx: f64,
     ) -> Self {
-        let gradient_mode = gradient_mode.parse().expect("invalid gradient mode");
         let solution_mode = solution_mode.parse().expect("invalid solution mode");
 
         if max_time == 0.0 && max_restarts == 0 {
@@ -34,7 +31,6 @@ impl PySolverConfig {
         }
 
         PySolverConfig(SolverConfig {
-            gradient_mode,
             solution_mode,
             max_time,
             max_restarts,

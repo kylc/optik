@@ -1,12 +1,35 @@
 use approx::assert_abs_diff_eq;
-use nalgebra::Vector6;
+use nalgebra::{DVector, Vector6};
 use optik::{
-    objective::{objective_grad, ObjectiveArgs},
-    GradientMode, Robot, SolverConfig,
+    objective::{objective, objective_grad, ObjectiveArgs},
+    Robot, SolverConfig,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const TEST_MODEL_STR: &str = include_str!("data/ur3e.urdf");
+
+fn finite_difference<F>(f: F, x: &[f64]) -> DVector<f64>
+where
+    F: Fn(&[f64]) -> f64,
+{
+    let n = x.len();
+    let mut g = vec![0.0; n];
+    let mut x0 = x.to_vec();
+    let eps = f64::EPSILON.powf(1.0 / 3.0);
+    for i in 0..n {
+        let x0i = x0[i];
+        x0[i] = x0i - eps;
+        // let fkl = args.robot.fk(&x0);
+        let fl = f(&x0);
+        x0[i] = x0i + eps;
+        // let fkh = args.robot.fk(&x0);
+        let fh = f(&x0);
+        g[i] = (fh - fl) / (2.0 * eps);
+        x0[i] = x0i;
+    }
+
+    DVector::from_row_slice(&g)
+}
 
 #[test]
 fn test_gradient_analytical_vs_numerical() {
@@ -21,29 +44,22 @@ fn test_gradient_analytical_vs_numerical() {
         // Analytical gradient
         let args = ObjectiveArgs {
             robot: &robot,
-            config: &SolverConfig {
-                gradient_mode: GradientMode::Analytical,
-                ..Default::default()
-            },
+            config: &SolverConfig::default(),
             tfm_target: &tfm_target,
         };
 
         let mut g_a = Vector6::zeros();
-        objective_grad(x0.as_slice(), g_a.as_mut_slice(), &args, &fk);
+        objective_grad(g_a.as_mut_slice(), &args, &fk);
 
         // Numerical gradient
-        let args = ObjectiveArgs {
-            robot: &robot,
-            config: &SolverConfig {
-                gradient_mode: GradientMode::Numerical,
-                ..Default::default()
+        let g_n = finite_difference(
+            |x| {
+                let fk = robot.fk(x);
+                objective(&args, &fk)
             },
-            tfm_target: &tfm_target,
-        };
+            x0.as_slice(),
+        );
 
-        let mut g_n = Vector6::zeros();
-        objective_grad(x0.as_slice(), g_n.as_mut_slice(), &args, &fk);
-
-        assert_abs_diff_eq!(g_a, g_n, epsilon = 1e-6);
+        assert_abs_diff_eq!(g_a.as_slice(), g_n.as_slice(), epsilon = 1e-6);
     }
 }
