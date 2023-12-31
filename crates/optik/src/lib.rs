@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -143,25 +142,19 @@ impl Robot {
                 .into_par_iter()
                 .panic_fuse()
                 .map(|i| {
-                    // Cache the forward kinematic container within each thread to
-                    // avoid re-allocating memory each objective iteration.
-                    let fk_cache = RefCell::new(ForwardKinematics::default());
-
                     let mut optimizer = Nlopt::new(
                         Algorithm::Lbfgs,
                         self.num_positions(),
-                        |x: &[f64], grad: Option<&mut [f64]>, _: &mut ()| {
+                        |x: &[f64], grad: Option<&mut [f64]>, fk: &mut ForwardKinematics| {
                             // Early-exit if we are out of time, or if another
                             // thread has already found a satisfactory solution.
                             if is_timed_out() || should_exit.load(Ordering::Relaxed) {
                                 return None;
                             }
 
-                            let mut fk = fk_cache.borrow_mut();
-
                             // Share kinematic results between the gradient and
                             // objective function evaluations, when possible.
-                            self.chain.forward_kinematics_mut(x, &mut fk);
+                            self.chain.forward_kinematics_mut(x, fk);
 
                             // Compute the gradient only if it was requested by the
                             // optimizer.
@@ -173,7 +166,10 @@ impl Robot {
                             Some(objective(&args, &fk))
                         },
                         Target::Minimize,
-                        (),
+                        // Cache the forward kinematic container within each
+                        // thread to avoid re-allocating memory each objective
+                        // iteration.
+                        ForwardKinematics::default(),
                     );
 
                     optimizer.set_stopval(config.tol_f).unwrap();
