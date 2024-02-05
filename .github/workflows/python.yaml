@@ -13,24 +13,27 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64
-          - os: macos-latest
+          - os: macos-13
             target: x86_64
+          - os: macos-14
+            target: aarch64
 
     steps:
       - name: checkout
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: symlink gfortran (macOS)
-        if: runner.os == 'macOS'
+      - name: symlink gfortran (macOS 13)
+        if: matrix.os == 'macos-13'
         run: |
-          ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
+          ln -sf /usr/local/bin/gfortran-12 /usr/local/bin/gfortran # MacOS 13
+          gfortran --version
+      - name: symlink gfortran (macOS 14)
+        if: matrix.os == 'macos-14'
+        run: |
+          ln -sf /opt/homebrew/bin/gfortran-12 /usr/local/bin/gfortran # MacOS 14
           gfortran --version
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
-          architecture: x64
       - name: build wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -41,12 +44,12 @@ jobs:
       - name: delocate wheel (macOS)
         if: runner.os == 'macOS'
         run: |
-          pip install delocate
+          pip3 install delocate
           delocate-wheel -v dist/*.whl
       - name: install built wheel
         run: |
-          pip install optik-py --no-index --find-links dist
-          python -c "import optik"
+          pip3 install optik-py --no-index --find-links dist
+          python3 -c "import optik"
       - name: upload wheels
         uses: actions/upload-artifact@v3
         with:
