@@ -75,7 +75,7 @@ impl SlsqpSolver {
         let l_w = n1*(n1+1) + meq*(n1+1) + mineq*(n1+1)  // for lsq
                  + (n1-meq+1)*(mineq+2) + 2*mineq        // for lsi
                  + (n1+mineq)*(n1-meq) + 2*meq + n1      // for lsei
-                  + n1*n/2 + 2*m + 3*n +3*n1 + 1; // for slsqpb
+                  + n1*n/2 + 2*m + 3*n +3*n1 + 100; // for slsqpb
 
         SlsqpSolver {
             m: m as c_int,
@@ -90,8 +90,8 @@ impl SlsqpSolver {
             iter: i32::MAX,
             mode: 0,
             w: vec![0.0; l_w],
-            slsqpb_data: vec![0; 28], // TODO: allocate from slsqpb_data structue,
-            linmin_data: vec![0; 36], // TODO: allocate from linmin_data structue,
+            slsqpb_data: vec![0; 112], // TODO: allocate from slsqpb_data structue,
+            linmin_data: vec![0; 144], // TODO: allocate from linmin_data structue,
             tolf: -1.0,
             toldf: -1.0,
             toldx: -1.0,
