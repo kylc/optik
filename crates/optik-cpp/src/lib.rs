@@ -5,12 +5,11 @@ use std::{
 
 use nalgebra::{DMatrix, Isometry3, Translation3, UnitQuaternion};
 
-use optik::{GradientMode, Robot, SolutionMode, SolverConfig};
+use optik::{Robot, SolutionMode, SolverConfig};
 
 #[repr(C)]
 struct CSolverConfig {
     solution_mode: SolutionMode,
-    gradient_mode: GradientMode,
     max_time: c_double,
     max_restarts: c_ulong,
     tol_f: c_double,
@@ -20,11 +19,6 @@ struct CSolverConfig {
 
 fn to_str(c_str: *const c_char) -> &'static str {
     unsafe { CStr::from_ptr(c_str).to_str().unwrap() }
-}
-
-#[no_mangle]
-extern "C" fn optik_set_parallelism(n: c_uint) {
-    optik::set_parallelism(n as usize)
 }
 
 #[no_mangle]
@@ -61,7 +55,15 @@ extern "C" fn optik_robot_free(robot: *mut Robot) {
 }
 
 #[no_mangle]
-extern "C" fn optik_robot_dof(robot: *const Robot) -> c_uint {
+extern "C" fn optik_robot_set_parallelism(robot: *mut Robot, n: c_uint) {
+    unsafe {
+        let robot = robot.as_mut().unwrap();
+        robot.set_parallelism(n as usize)
+    }
+}
+
+#[no_mangle]
+extern "C" fn optik_robot_num_positions(robot: *const Robot) -> c_uint {
     unsafe {
         let robot = robot.as_ref().unwrap();
         robot.num_positions() as c_uint
@@ -89,7 +91,7 @@ extern "C" fn optik_robot_fk(robot: *const Robot, x: *const c_double) -> *const 
         let robot = robot.as_ref().unwrap();
         let x = std::slice::from_raw_parts(x, robot.num_positions());
 
-        let ee_pose = robot.fk(x);
+        let ee_pose = robot.fk(x).ee_tfm();
 
         ee_pose.to_matrix().data.as_slice().to_vec().leak().as_ptr()
     }
@@ -118,13 +120,12 @@ extern "C" fn optik_robot_ik(
         let target = std::slice::from_raw_parts(target, 4 * 4);
         let m = DMatrix::from_column_slice(4, 4, target);
 
-        let t = Translation3::from(m.fixed_slice::<3, 1>(0, 3).into_owned());
-        let r = UnitQuaternion::from_matrix(&m.fixed_slice::<3, 3>(0, 0).into_owned());
+        let t = Translation3::from(m.fixed_view::<3, 1>(0, 3).into_owned());
+        let r = UnitQuaternion::from_matrix(&m.fixed_view::<3, 3>(0, 0).into_owned());
 
         let ee_pose = Isometry3::from_parts(t, r);
 
         let config = SolverConfig {
-            gradient_mode: (*config).gradient_mode,
             solution_mode: (*config).solution_mode,
             max_time: (*config).max_time,
             max_restarts: (*config).max_restarts,

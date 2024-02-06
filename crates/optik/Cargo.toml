@@ -11,13 +11,13 @@ name = "optik"
 crate-type = ["rlib"]
 
 [dependencies]
-k = "0.31"
-nalgebra = "0.30"
+nalgebra = "0.32"
+nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"
+petgraph = "0.6"
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.8"
-slsqp-sys = { path = "../slsqp-sys" }
 urdf-rs = "0.8"
 
 [[example]]
@@ -27,7 +27,7 @@ path = "../../examples/example.rs"
 [dev-dependencies]
 approx = "0.5"
 criterion = "0.5"
-nalgebra = { version = "0.30", features = [ "rand", "serde-serialize" ] }
+nalgebra = { version = "0.32", features = [ "rand", "serde-serialize" ] }
 serde = "1.0"
 serde_json = "1.0"
 

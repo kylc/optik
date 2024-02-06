@@ -1,14 +1,7 @@
-use std::ops::Deref;
-
-use optik::{GradientMode, Robot, SolutionMode, SolverConfig};
+use optik::{Robot, SolverConfig};
 
 use nalgebra::{Isometry3, Matrix4, Rotation3, Translation3, UnitQuaternion};
 use pyo3::prelude::*;
-
-#[pyfunction]
-fn set_parallelism(n: usize) {
-    optik::set_parallelism(n)
-}
 
 #[pyclass]
 #[pyo3(name = "SolverConfig")]
@@ -17,46 +10,33 @@ struct PySolverConfig(SolverConfig);
 #[pymethods]
 impl PySolverConfig {
     #[new]
-    #[pyo3(signature=(gradient_mode="analytical",
-                      solution_mode="speed",
+    #[pyo3(signature=(solution_mode="speed",
                       max_time=0.1,
                       max_restarts=u64::MAX,
                       tol_f=1e-6,
-                      tol_dx=-1.0,
-                      tol_df=-1.0))]
+                      tol_df=-1.0,
+                      tol_dx=-1.0))]
     fn py_new(
-        gradient_mode: &str,
         solution_mode: &str,
         max_time: f64,
         max_restarts: u64,
         tol_f: f64,
-        tol_dx: f64,
         tol_df: f64,
+        tol_dx: f64,
     ) -> Self {
-        let gradient_mode = match gradient_mode {
-            "analytical" => GradientMode::Analytical,
-            "numerical" => GradientMode::Numerical,
-            _ => panic!("invalid gradient mode"),
-        };
-
-        let solution_mode = match solution_mode {
-            "speed" => SolutionMode::Speed,
-            "quality" => SolutionMode::Quality,
-            _ => panic!("invalid solution mode"),
-        };
+        let solution_mode = solution_mode.parse().expect("invalid solution mode");
 
         if max_time == 0.0 && max_restarts == 0 {
             panic!("no time or restart limit applied -- solver would run forever")
         }
 
         PySolverConfig(SolverConfig {
-            gradient_mode,
             solution_mode,
             max_time,
             max_restarts,
-            tol_dx,
             tol_f,
             tol_df,
+            tol_dx,
         })
     }
 }
@@ -65,19 +45,15 @@ impl PySolverConfig {
 #[pyo3(name = "Robot")]
 pub struct PyRobot(Robot);
 
-impl Deref for PyRobot {
-    type Target = Robot;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[pymethods]
 impl PyRobot {
     #[staticmethod]
     fn from_urdf_file(path: &str, base_link: &str, ee_link: &str) -> PyRobot {
         PyRobot(Robot::from_urdf_file(path, base_link, ee_link))
+    }
+
+    pub fn set_parallelism(&mut self, n: usize) {
+        self.0.set_parallelism(n);
     }
 
     pub fn num_positions(&self) -> usize {
@@ -98,7 +74,7 @@ impl PyRobot {
 
         assert_eq!(x.len(), robot.num_positions());
 
-        let ee_pose = robot.fk(&x);
+        let ee_pose = robot.fk(&x).ee_tfm();
         ee_pose
             .to_matrix()
             .row_iter()
@@ -119,13 +95,13 @@ impl PyRobot {
         fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
             let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
 
-            let t = Translation3::from(m.fixed_slice::<3, 1>(0, 3).into_owned());
+            let t = Translation3::from(m.fixed_view::<3, 1>(0, 3).into_owned());
 
             // Some rotational gymnastics here to work around an nalgebra bug
             // (fixed in 0.31) which fails on direct conversion from Matrix3 ->
             // UnitQuaternion for inputs that are already a rotation matrix.
             // https://github.com/dimforge/nalgebra/pull/1101
-            let g = m.fixed_slice::<3, 3>(0, 0).into_owned();
+            let g = m.fixed_view::<3, 3>(0, 0).into_owned();
             let r = Rotation3::from_matrix_unchecked(g);
             let q = UnitQuaternion::from_rotation_matrix(&r);
 
@@ -142,6 +118,5 @@ impl PyRobot {
 fn optik_extension(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyRobot>()?;
     m.add_class::<PySolverConfig>()?;
-    m.add_function(wrap_pyfunction!(set_parallelism, m)?)?;
     Ok(())
 }

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(C)]
 pub enum SolutionMode {
@@ -5,16 +7,20 @@ pub enum SolutionMode {
     Speed = 2,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(C)]
-pub enum GradientMode {
-    Analytical = 1,
-    Numerical = 2,
+impl FromStr for SolutionMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "quality" => Ok(SolutionMode::Quality),
+            "speed" => Ok(SolutionMode::Speed),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct SolverConfig {
-    pub gradient_mode: GradientMode,
     pub solution_mode: SolutionMode,
 
     /// Stopping criteria: elapsed_time > max_time
@@ -40,7 +46,6 @@ pub struct SolverConfig {
 impl Default for SolverConfig {
     fn default() -> Self {
         SolverConfig {
-            gradient_mode: GradientMode::Analytical,
             solution_mode: SolutionMode::Speed,
             max_time: 0.1,
             max_restarts: u64::MAX,

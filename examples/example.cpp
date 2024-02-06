@@ -16,12 +16,12 @@ int main(int argc, char **argv) {
     std::exit(1);
   }
 
-  optik::SetParallelism(std::thread::hardware_concurrency() / 2);
-  const auto robot = optik::Robot::FromUrdfFile(argv[1], argv[2], argv[3]);
+  auto robot = optik::Robot::FromUrdfFile(argv[1], argv[2], argv[3]);
+  robot.SetParallelism(std::thread::hardware_concurrency() / 2);
 
   optik::SolverConfig config;
 
-  int n = 1000;
+  int n = 10000;
   int total_us = 0;
 
   for (int i = 0; i < n; i++) {

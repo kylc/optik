@@ -21,18 +21,6 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
-      - name: symlink gfortran (macOS 13)
-        if: matrix.os == 'macos-13'
-        run: |
-          ln -sf /usr/local/bin/gfortran-12 /usr/local/bin/gfortran # MacOS 13
-          gfortran --version
-      - name: symlink gfortran (macOS 14)
-        if: matrix.os == 'macos-14'
-        run: |
-          ln -sf /opt/homebrew/bin/gfortran-12 /usr/local/bin/gfortran # MacOS 14
-          gfortran --version
       - uses: dtolnay/rust-toolchain@stable
       - name: build wheel
         uses: PyO3/maturin-action@v1

@@ -10,7 +10,7 @@
 
 A fast inverse kinematics solver for arbitrary serial chains providing Rust, C++, and Python programming interfaces.
 
-The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization problem is formulated and minimized using an SLSQP solver [[2]]. However, this work differs in a couple of ways:
+The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization problem is formulated and minimized. However, this work differs in a couple of ways:
 
 - The gradient of the objective function is computed analytically. This is an immediate performance improvement over finite difference approaches, because it requires only one evaluation of the forward kinematics per gradient evaluation.
 - Random restarting of the nonlinear solver is implemented in a work stealing parallel fashion, so that overall solve time is decreased thanks to the improved chance of finding a good seed.
@@ -18,7 +18,6 @@ The implementation is similar to TRAC-IK [[1]] in that a nonlinear optimization 
 - A parallel Newton's method solver is **not** included, because the performance of the full nonlinear problem is quite good on its own.
 
 [1]: https://traclabs.com/projects/trac-ik/
-[2]: https://github.com/jacobwilliams/slsqp
 
 ## Benchmark [^1]
 
@@ -98,6 +97,6 @@ cmake --build .
 
 P. Beeson and B. Ames, “TRAC-IK: An open-source library for improved solving of generic inverse kinematics,” in 2015 IEEE-RAS 15th International Conference on Humanoid Robots (Humanoids), Seoul, South Korea: IEEE, Nov. 2015, pp. 928–935. doi: 10.1109/HUMANOIDS.2015.7363472.
 
-J. Williams, "Modern Fortran Edition of the SLSQP Optimizer", Version 1.4.1, 4 Jun 2023, https://github.com/jacobwilliams/slsqp
-
 J. Solà, J. Deray, and D. Atchuthan, “A micro Lie theory for state estimation in robotics.” arXiv, Dec. 08, 2021. Accessed: Jul. 24, 2023. [Online]. Available: http://arxiv.org/abs/1812.01537
+
+Steven G. Johnson, The NLopt nonlinear-optimization package, http://github.com/stevengj/nlopt

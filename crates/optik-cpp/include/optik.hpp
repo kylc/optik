@@ -15,27 +15,14 @@ enum class SolutionMode {
   kSpeed = 2,
 };
 
-enum class GradientMode {
-  kAnalytical = 1,
-  kNumerical = 2,
-};
-
 struct SolverConfig {
   SolutionMode solution_mode = SolutionMode::kSpeed;
-  GradientMode gradient_mode = GradientMode::kAnalytical;
   double max_time = 0.1;
   unsigned long max_restarts = 0;
   double tol_f = 1e-6;
   double tol_df = -1.0;
   double tol_dx = -1.0;
 };
-
-//! Sets the number of threads to be used for various parallel operations within
-//! subsequent library calls.
-//!
-//! NOTE: This must be called at most one time and before any parallel library
-//! operations are called (e.g. solving IK).
-void SetParallelism(unsigned int n);
 
 class Robot final {
  public:
@@ -68,6 +55,10 @@ class Robot final {
   static Robot FromUrdfStr(const std::string& urdf,
                            const std::string& base_link,
                            const std::string& ee_link);
+
+  //! Sets the number of threads to be used for various parallel operations
+  //! within subsequent library calls.
+  void SetParallelism(unsigned int n);
 
   //! Draw a random generalized position vector from a uniform distribution
   //! subject to the joint limits.

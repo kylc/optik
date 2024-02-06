@@ -4,7 +4,6 @@ members = [
   "crates/optik",
   "crates/optik-py",
   "crates/optik-cpp",
-  "crates/slsqp-sys",
 ]
 
 [workspace.package]
