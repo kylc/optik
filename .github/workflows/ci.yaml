@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo check
@@ -35,14 +33,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
       - uses: taiki-e/install-action@nextest
-      - name: symlink gfortran (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          ln -s /usr/local/bin/gfortran-12 /usr/local/bin/gfortran
-          gfortran --version
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo nextest run --profile ci --all-targets
