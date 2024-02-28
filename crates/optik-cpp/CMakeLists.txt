@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(optik VERSION 0.4.0)
+project(optik VERSION 0.4.1)
 
 find_package(Eigen3 REQUIRED)
 
