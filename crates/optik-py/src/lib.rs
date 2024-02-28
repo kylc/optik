@@ -1,6 +1,6 @@
 use optik::{Robot, SolverConfig};
 
-use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion};
+use nalgebra::{Isometry3, Matrix4};
 use pyo3::prelude::*;
 
 #[pyclass]
@@ -94,11 +94,7 @@ impl PyRobot {
 
         fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
             let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
-
-            let t = Translation3::from(m.fixed_view::<3, 1>(0, 3).into_owned());
-            let r = UnitQuaternion::from_matrix(&m.fixed_view::<3, 3>(0, 0).into_owned());
-
-            Isometry3::from_parts(t, r)
+            nalgebra::try_convert(m).expect("invalid target transform specified")
         }
 
         let target = parse_pose(target);
