@@ -29,11 +29,23 @@ extern double* optik_robot_ik(const optik::detail::robot* robot,
 
 namespace optik {
 
+Robot::Robot(Robot&& other) : inner_(std::move(other.inner_)) {
+  // Leave a sentinel value in the pointer so that we don't accidentally to
+  // double free it in the moved-from object destructor.
+  other.inner_ = nullptr;
+};
+
 Robot::~Robot() {
   if (inner_ != nullptr) {
     optik_robot_free(inner_);
   }
 }
+
+Robot& Robot::operator=(Robot&& other) {
+  inner_ = std::move(other.inner_);
+  other.inner_ = nullptr;  // same as in move constructor
+  return *this;
+};
 
 Robot Robot::FromUrdfFile(const std::string& path, const std::string& base_link,
                           const std::string& ee_link) {

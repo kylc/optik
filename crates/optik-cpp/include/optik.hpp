@@ -27,17 +27,11 @@ struct SolverConfig {
 class Robot final {
  public:
   Robot(Robot& other) = delete;
-  Robot(Robot&& other) : inner_(std::move(other.inner_)) {
-    other.inner_ = nullptr;
-  };
+  Robot(Robot&& other);
   ~Robot();
 
   Robot& operator=(Robot& other) = delete;
-  Robot& operator=(Robot&& other) {
-    inner_ = std::move(other.inner_);
-    other.inner_ = nullptr;
-    return *this;
-  };
+  Robot& operator=(Robot&& other);
 
   //! Load a URDF model file from the given path, and build a chain from the
   //! named base to the named end-effector link.
