@@ -13,10 +13,13 @@ extern optik::detail::robot* optik_robot_from_urdf_str(const char* urdf,
 extern void optik_robot_free(optik::detail::robot* robot);
 
 extern void optik_robot_set_parallelism(optik::detail::robot*, unsigned int n);
-extern unsigned int optik_robot_num_positions(const optik::detail::robot* robot);
+extern unsigned int optik_robot_num_positions(
+    const optik::detail::robot* robot);
 extern double* optik_robot_joint_limits(const optik::detail::robot* robot);
 extern double* optik_robot_random_configuration(
     const optik::detail::robot* robot);
+extern double* optik_robot_joint_jacobian(const optik::detail::robot* robot,
+                                          const double* x);
 extern double* optik_robot_fk(const optik::detail::robot* robot,
                               const double* x);
 extern double* optik_robot_ik(const optik::detail::robot* robot,
@@ -54,6 +57,21 @@ Eigen::VectorXd Robot::RandomConfiguration() const noexcept {
   free(q_data);
 
   return q;
+}
+
+Eigen::Matrix<double, 6, Eigen::Dynamic> Robot::JointJacobian(
+    const Eigen::VectorXd& q) const {
+  using JacobianMatrix = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+
+  if (q.size() != num_positions()) {
+    throw std::runtime_error("dof mismatch");
+  }
+
+  double* jac_data = optik_robot_joint_jacobian(inner_, q.data());
+  JacobianMatrix jac = Eigen::Map<JacobianMatrix>(jac_data, 6, num_positions());
+  free(jac_data);
+
+  return jac;
 }
 
 Eigen::Isometry3d Robot::DoFk(const Eigen::VectorXd& q) const {

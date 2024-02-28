@@ -64,6 +64,13 @@ class Robot final {
   //! subject to the joint limits.
   Eigen::VectorXd RandomConfiguration() const noexcept;
 
+  //! Compute the joint Jacobian matrix of the end-effector in the given joint
+  //! configuration.
+  //!
+  //! Panics if `q` does not match the number of generalized positions.
+  Eigen::Matrix<double, 6, Eigen::Dynamic> JointJacobian(
+      const Eigen::VectorXd& q) const;
+
   //! Compute the pose of the end-effector link w.r.t. the base link, expressed
   //! in the base link.
   //!

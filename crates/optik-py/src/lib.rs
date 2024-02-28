@@ -69,6 +69,18 @@ impl PyRobot {
         )
     }
 
+    fn joint_jacobian(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
+        let robot = &self.0;
+
+        assert_eq!(x.len(), robot.num_positions());
+
+        let fk = robot.fk(&x);
+        let jac = robot.joint_jacobian(&fk);
+        jac.row_iter()
+            .map(|row| row.iter().copied().collect())
+            .collect()
+    }
+
     fn fk(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 

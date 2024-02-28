@@ -86,6 +86,22 @@ extern "C" fn optik_robot_joint_limits(robot: *const Robot) -> *const c_double {
 }
 
 #[no_mangle]
+extern "C" fn optik_robot_joint_jacobian(
+    robot: *const Robot,
+    x: *const c_double,
+) -> *const c_double {
+    unsafe {
+        let robot = robot.as_ref().unwrap();
+        let x = std::slice::from_raw_parts(x, robot.num_positions());
+
+        let fk = robot.fk(x);
+        let jac = robot.joint_jacobian(&fk);
+
+        jac.data.as_slice().to_vec().leak().as_ptr()
+    }
+}
+
+#[no_mangle]
 extern "C" fn optik_robot_fk(robot: *const Robot, x: *const c_double) -> *const c_double {
     unsafe {
         let robot = robot.as_ref().unwrap();
