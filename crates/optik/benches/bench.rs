@@ -20,7 +20,7 @@ fn bench_gradient(c: &mut Criterion) {
 
     c.bench_function("gradient", |b| {
         let fk = robot.fk(&q);
-        b.iter(|| objective_grad(&robot, &tfm_target, &fk, &mut g))
+        b.iter(|| objective_grad(&robot, &tfm_target, &fk, &mut g, 0.0, 0.0))
     });
 }
 
@@ -33,7 +33,7 @@ fn bench_objective(c: &mut Criterion) {
     let fk = robot.fk(&q);
     let tfm_target = Isometry3::identity();
     c.bench_function("objective", |b| {
-        b.iter(|| objective(&robot, &tfm_target, &fk))
+        b.iter(|| objective(&robot, &tfm_target, &fk, 0.0, 0.0))
     });
 }
 

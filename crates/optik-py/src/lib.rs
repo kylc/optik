@@ -15,7 +15,9 @@ impl PySolverConfig {
                       max_restarts=u64::MAX,
                       tol_f=1e-6,
                       tol_df=-1.0,
-                      tol_dx=-1.0))]
+                      tol_dx=-1.0,
+                      tol_linear=-1.0,
+                      tol_angular=-1.0))]
     fn py_new(
         solution_mode: &str,
         max_time: f64,
@@ -23,6 +25,8 @@ impl PySolverConfig {
         tol_f: f64,
         tol_df: f64,
         tol_dx: f64,
+        tol_linear: f64,
+        tol_angular: f64,
     ) -> Self {
         let solution_mode = solution_mode.parse().expect("invalid solution mode");
 
@@ -37,6 +41,8 @@ impl PySolverConfig {
             tol_f,
             tol_df,
             tol_dx,
+            tol_linear,
+            tol_angular,
         })
     }
 }

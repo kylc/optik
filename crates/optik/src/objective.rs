@@ -2,16 +2,33 @@ use nalgebra::Isometry3;
 
 use crate::{kinematics::ForwardKinematics, math::se3, Robot};
 
-pub fn objective(_robot: &Robot, tfm_target: &Isometry3<f64>, fk: &ForwardKinematics) -> f64 {
+pub fn objective(
+    _robot: &Robot,
+    tfm_target: &Isometry3<f64>,
+    fk: &ForwardKinematics,
+    tol_linear: f64,
+    tol_angular: f64,
+) -> f64 {
     // Compute the pose error w.r.t. the actual pose:
     //
     //   X_AT = X_WA^1 * X_WT
     let tfm_actual = fk.ee_tfm();
     let tfm_error = tfm_target.inv_mul(&tfm_actual);
 
+    let mut e = se3::log(&tfm_error);
+
+    // Linear and/or angular error terms go to zero if they are within the
+    // tolerances.
+    if tol_linear > 0.0 && e.fixed_rows::<3>(0).norm() <= tol_linear {
+        e.fixed_rows_mut::<3>(0).fill(0.0);
+    }
+    if tol_angular > 0.0 && e.fixed_rows::<3>(3).norm() <= tol_angular {
+        e.fixed_rows_mut::<3>(3).fill(0.0);
+    }
+
     // Minimize the sqaure Euclidean distance of the log pose error. We choose
     // to use the square distance due to its smoothness.
-    se3::log(&tfm_error).norm_squared()
+    e.norm_squared()
 }
 
 /// Compute the gradient `g` w.r.t. the local parameterization.
@@ -20,6 +37,8 @@ pub fn objective_grad(
     tfm_target: &Isometry3<f64>,
     fk: &ForwardKinematics,
     g: &mut [f64],
+    tol_linear: f64,
+    tol_angular: f64,
 ) {
     // Pose error is computed as in the objective function.
     let tfm_actual = fk.ee_tfm();
@@ -52,7 +71,19 @@ pub fn objective_grad(
     //   g = log(X)
     //   f = || g ||^2
     //   h' = (f' ∘ g) * g' = (2.0 * log6(X)) * J
-    let fdot_g = 2.0 * se3::log(&tfm_error).transpose();
+
+    let mut e = se3::log(&tfm_error);
+
+    // Linear and/or angular error terms go to zero if they are within the
+    // tolerances.
+    if tol_linear > 0.0 && e.fixed_rows::<3>(0).norm() <= tol_linear {
+        e.fixed_rows_mut::<3>(0).fill(0.0);
+    }
+    if tol_angular > 0.0 && e.fixed_rows::<3>(3).norm() <= tol_angular {
+        e.fixed_rows_mut::<3>(3).fill(0.0);
+    }
+
+    let fdot_g = 2.0 * e.transpose();
     let grad_h = fdot_g * j_task;
 
     g.copy_from_slice(grad_h.as_slice());

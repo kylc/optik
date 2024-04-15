@@ -9,6 +9,8 @@ class SolverConfig:
         tol_f: float = ...,
         tol_df: float = ...,
         tol_dx: float = ...,
+        tol_linear: float = ...,
+        tol_angular: float = ...,
     ): ...
 
 class Robot:

@@ -168,11 +168,24 @@ impl Robot {
                             // Compute the gradient only if it was requested by
                             // the optimizer.
                             if let Some(g) = grad {
-                                objective_grad(self, tfm_target, fk, g);
+                                objective_grad(
+                                    self,
+                                    tfm_target,
+                                    fk,
+                                    g,
+                                    config.tol_linear,
+                                    config.tol_angular,
+                                );
                             }
 
                             // Always compute the objective value.
-                            Some(objective(self, tfm_target, fk))
+                            Some(objective(
+                                self,
+                                tfm_target,
+                                fk,
+                                config.tol_linear,
+                                config.tol_angular,
+                            ))
                         },
                         Target::Minimize,
                         // Cache the forward kinematic container within each

@@ -34,6 +34,8 @@ where
 #[test]
 fn test_gradient_analytical_vs_numerical() {
     let robot = Robot::from_urdf_str(TEST_MODEL_STR, "ur_base_link", "ur_ee_link");
+    let tol_linear = 0.0;
+    let tol_angular = 0.0;
 
     let mut rng = StdRng::seed_from_u64(42);
     for _ in 0..100 {
@@ -43,13 +45,20 @@ fn test_gradient_analytical_vs_numerical() {
 
         // Analytical gradient
         let mut g_a = Vector6::zeros();
-        objective_grad(&robot, &tfm_target, &fk, g_a.as_mut_slice());
+        objective_grad(
+            &robot,
+            &tfm_target,
+            &fk,
+            g_a.as_mut_slice(),
+            tol_linear,
+            tol_angular,
+        );
 
         // Numerical gradient
         let g_n = finite_difference(
             |x| {
                 let fk = robot.fk(x);
-                objective(&robot, &tfm_target, &fk)
+                objective(&robot, &tfm_target, &fk, tol_linear, tol_angular)
             },
             x0.as_slice(),
         );

@@ -22,6 +22,8 @@ struct SolverConfig {
   double tol_f = 1e-6;
   double tol_df = -1.0;
   double tol_dx = -1.0;
+  double tol_linear = -1.0;
+  double tol_angular = -1.0;
 };
 
 class Robot final {
