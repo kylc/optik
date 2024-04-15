@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)] // silence warning from pyo3::pymethods macro
+
 use optik::{Robot, SolverConfig};
 
 use nalgebra::{Isometry3, Matrix4};
@@ -18,6 +20,7 @@ impl PySolverConfig {
                       tol_dx=-1.0,
                       tol_linear=-1.0,
                       tol_angular=-1.0))]
+    #[allow(clippy::too_many_arguments)]
     fn py_new(
         solution_mode: &str,
         max_time: f64,
@@ -122,7 +125,7 @@ impl PyRobot {
 
 #[pymodule()]
 #[pyo3(name = "optik")]
-fn optik_extension(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn optik_extension(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRobot>()?;
     m.add_class::<PySolverConfig>()?;
     Ok(())
