@@ -42,11 +42,11 @@ pub struct SolverConfig {
     /// Stopping criteria: ||x_{n+1} - x_n|| < tol_dx
     pub tol_dx: f64,
 
-    /// Linear cost term goes to zero once ||e_linear|| <= tol_linear
-    pub tol_linear: f64,
+    /// Scaling applied to the linear error in the base link frame.
+    pub linear_weight: [f64; 3],
 
-    /// Angular cost term goes to zero once ||e_angular|| <= tol_angular
-    pub tol_angular: f64,
+    /// Scaling applied to the angular error in the base link frame.
+    pub angular_weight: [f64; 3],
 }
 
 impl Default for SolverConfig {
@@ -58,8 +58,8 @@ impl Default for SolverConfig {
             tol_f: 1e-6,
             tol_df: -1.0,
             tol_dx: -1.0,
-            tol_linear: -1.0,
-            tol_angular: -1.0,
+            linear_weight: [1.0; 3],
+            angular_weight: [1.0; 3],
         }
     }
 }

@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use nalgebra::Isometry3;
+use nalgebra::{vector, Isometry3};
 
 use optik::*;
 
@@ -20,7 +20,16 @@ fn bench_gradient(c: &mut Criterion) {
 
     c.bench_function("gradient", |b| {
         let fk = robot.fk(&q);
-        b.iter(|| objective_grad(&robot, &tfm_target, &fk, &mut g, 0.0, 0.0))
+        b.iter(|| {
+            objective_grad(
+                &robot,
+                &tfm_target,
+                &fk,
+                &mut g,
+                vector![1.0, 1.0, 1.0],
+                vector![1.0, 1.0, 1.0],
+            )
+        })
     });
 }
 
@@ -33,7 +42,15 @@ fn bench_objective(c: &mut Criterion) {
     let fk = robot.fk(&q);
     let tfm_target = Isometry3::identity();
     c.bench_function("objective", |b| {
-        b.iter(|| objective(&robot, &tfm_target, &fk, 0.0, 0.0))
+        b.iter(|| {
+            objective(
+                &robot,
+                &tfm_target,
+                &fk,
+                vector![1.0, 1.0, 1.0],
+                vector![1.0, 1.0, 1.0],
+            )
+        })
     });
 }
 
