@@ -15,8 +15,8 @@ struct CSolverConfig {
     tol_f: c_double,
     tol_df: c_double,
     tol_dx: c_double,
-    tol_linear: c_double,
-    tol_angular: c_double,
+    linear_weight: *const c_double,
+    angular_weight: *const c_double,
 }
 
 fn to_str(c_str: *const c_char) -> &'static str {
@@ -150,8 +150,12 @@ extern "C" fn optik_robot_ik(
             tol_f: (*config).tol_f,
             tol_df: (*config).tol_df,
             tol_dx: (*config).tol_dx,
-            tol_linear: (*config).tol_linear,
-            tol_angular: (*config).tol_angular,
+            linear_weight: std::slice::from_raw_parts((*config).linear_weight, 3)
+                .try_into()
+                .unwrap(),
+            angular_weight: std::slice::from_raw_parts((*config).angular_weight, 3)
+                .try_into()
+                .unwrap(),
         };
         if let Some((v, _)) = robot.ik(&config, &ee_pose, x0.to_vec()) {
             v.leak().as_ptr()

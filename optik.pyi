@@ -9,8 +9,8 @@ class SolverConfig:
         tol_f: float = ...,
         tol_df: float = ...,
         tol_dx: float = ...,
-        tol_linear: float = ...,
-        tol_angular: float = ...,
+        linear_weight: list[float] = ...,
+        angular_weight: list[float] = ...,
     ): ...
 
 class Robot:

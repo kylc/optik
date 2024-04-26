@@ -1,30 +1,55 @@
-use nalgebra::Isometry3;
+use nalgebra::{Isometry3, Vector3, Vector6};
 
 use crate::{kinematics::ForwardKinematics, math::se3, Robot};
+
+const IDENTITY_EPS: f64 = 1e-20;
+
+fn apply_weighting(
+    mut e: Vector6<f64>,
+    tfm_target: &Isometry3<f64>,
+    linear_weight: &Vector3<f64>,
+    angular_weight: &Vector3<f64>,
+) -> Vector6<f64> {
+    if !linear_weight.is_identity(IDENTITY_EPS) {
+        // Rotate the error vector into the world frame.
+        let e_lin_w = tfm_target * e.fixed_rows::<3>(0).clone_owned();
+
+        // Apply the weights.
+        let e_lin_w_scaled = e_lin_w.component_mul(linear_weight);
+
+        // Rotate back into the target frame.
+        let e_lin_scaled = tfm_target.inverse_transform_vector(&e_lin_w_scaled);
+        e.fixed_rows_mut::<3>(0).copy_from(&e_lin_scaled);
+    }
+
+    if !angular_weight.is_identity(IDENTITY_EPS) {
+        // Rotate the error vector into the world frame.
+        let e_ang_w = tfm_target * e.fixed_rows::<3>(3).clone_owned();
+
+        // Apply the weights.
+        let e_ang_w_scaled = e_ang_w.component_mul(angular_weight);
+
+        // Rotate back into the target frame.
+        let e_ang_scaled = tfm_target.inverse_transform_vector(&e_ang_w_scaled);
+        e.fixed_rows_mut::<3>(3).copy_from(&e_ang_scaled);
+    }
+
+    e
+}
 
 pub fn objective(
     _robot: &Robot,
     tfm_target: &Isometry3<f64>,
     fk: &ForwardKinematics,
-    tol_linear: f64,
-    tol_angular: f64,
+    linear_weight: Vector3<f64>,
+    angular_weight: Vector3<f64>,
 ) -> f64 {
-    // Compute the pose error w.r.t. the actual pose:
-    //
-    //   X_AT = X_WA^1 * X_WT
-    let tfm_actual = fk.ee_tfm();
-    let tfm_error = tfm_target.inv_mul(&tfm_actual);
+    // Compute the pose error w.r.t. the target pose:
+    let x_world_act = fk.ee_tfm();
+    let x_target_act = tfm_target.inv_mul(&x_world_act);
 
-    let mut e = se3::log(&tfm_error);
-
-    // Linear and/or angular error terms go to zero if they are within the
-    // tolerances.
-    if tol_linear > 0.0 && e.fixed_rows::<3>(0).norm() <= tol_linear {
-        e.fixed_rows_mut::<3>(0).fill(0.0);
-    }
-    if tol_angular > 0.0 && e.fixed_rows::<3>(3).norm() <= tol_angular {
-        e.fixed_rows_mut::<3>(3).fill(0.0);
-    }
+    let e = se3::log(&x_target_act);
+    let e = apply_weighting(e, tfm_target, &linear_weight, &angular_weight);
 
     // Minimize the sqaure Euclidean distance of the log pose error. We choose
     // to use the square distance due to its smoothness.
@@ -37,12 +62,12 @@ pub fn objective_grad(
     tfm_target: &Isometry3<f64>,
     fk: &ForwardKinematics,
     g: &mut [f64],
-    tol_linear: f64,
-    tol_angular: f64,
+    linear_weight: Vector3<f64>,
+    angular_weight: Vector3<f64>,
 ) {
     // Pose error is computed as in the objective function.
-    let tfm_actual = fk.ee_tfm();
-    let tfm_error = tfm_target.inv_mul(&tfm_actual);
+    let x_world_act = fk.ee_tfm();
+    let x_target_act = tfm_target.inv_mul(&x_world_act);
 
     // We compute the Jacobian of our task w.r.t. the joint angles.
     //
@@ -52,7 +77,7 @@ pub fn objective_grad(
     //
     //   Jtask(q) = Jlog6(X) * J(q)
     let j_qdot = robot.joint_jacobian(fk);
-    let j_log6 = se3::right_jacobian(&tfm_error);
+    let j_log6 = se3::right_jacobian(&x_target_act);
     let j_task = j_log6 * j_qdot;
 
     // We must compute the objective function gradient:
@@ -72,16 +97,11 @@ pub fn objective_grad(
     //   f = || g ||^2
     //   h' = (f' ∘ g) * g' = (2.0 * log6(X)) * J
 
-    let mut e = se3::log(&tfm_error);
+    let e = se3::log(&x_target_act);
 
-    // Linear and/or angular error terms go to zero if they are within the
-    // tolerances.
-    if tol_linear > 0.0 && e.fixed_rows::<3>(0).norm() <= tol_linear {
-        e.fixed_rows_mut::<3>(0).fill(0.0);
-    }
-    if tol_angular > 0.0 && e.fixed_rows::<3>(3).norm() <= tol_angular {
-        e.fixed_rows_mut::<3>(3).fill(0.0);
-    }
+    let linear_weight_2 = linear_weight.component_mul(&linear_weight);
+    let angular_weight_2 = angular_weight.component_mul(&angular_weight);
+    let e = apply_weighting(e, tfm_target, &linear_weight_2, &angular_weight_2);
 
     let fdot_g = 2.0 * e.transpose();
     let grad_h = fdot_g * j_task;

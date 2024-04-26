@@ -7,7 +7,7 @@ use std::{
     time::Instant,
 };
 
-use nalgebra::{DVectorView, Isometry3, Matrix6xX};
+use nalgebra::{DVectorView, Isometry3, Matrix6xX, Vector3};
 use nlopt::{Algorithm, Nlopt, SuccessState, Target};
 use ordered_float::OrderedFloat;
 use rand::SeedableRng;
@@ -173,8 +173,8 @@ impl Robot {
                                     tfm_target,
                                     fk,
                                     g,
-                                    config.tol_linear,
-                                    config.tol_angular,
+                                    Vector3::from_row_slice(&config.linear_weight),
+                                    Vector3::from_row_slice(&config.angular_weight),
                                 );
                             }
 
@@ -183,8 +183,8 @@ impl Robot {
                                 self,
                                 tfm_target,
                                 fk,
-                                config.tol_linear,
-                                config.tol_angular,
+                                Vector3::from_row_slice(&config.linear_weight),
+                                Vector3::from_row_slice(&config.angular_weight),
                             ))
                         },
                         Target::Minimize,
