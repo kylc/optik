@@ -96,7 +96,7 @@ extern "C" fn optik_robot_joint_jacobian(
         let robot = robot.as_ref().unwrap();
         let x = std::slice::from_raw_parts(x, robot.num_positions());
 
-        let fk = robot.fk(x);
+        let fk = robot.fk(x, &Isometry3::identity());
         let jac = robot.joint_jacobian(&fk);
 
         jac.data.as_slice().to_vec().leak().as_ptr()
@@ -109,7 +109,7 @@ extern "C" fn optik_robot_fk(robot: *const Robot, x: *const c_double) -> *const 
         let robot = robot.as_ref().unwrap();
         let x = std::slice::from_raw_parts(x, robot.num_positions());
 
-        let ee_pose = robot.fk(x).ee_tfm();
+        let ee_pose = robot.fk(x, &Isometry3::identity()).ee_tfm();
 
         ee_pose.to_matrix().data.as_slice().to_vec().leak().as_ptr()
     }
@@ -157,7 +157,7 @@ extern "C" fn optik_robot_ik(
                 .try_into()
                 .unwrap(),
         };
-        if let Some((v, _)) = robot.ik(&config, &ee_pose, x0.to_vec()) {
+        if let Some((v, _)) = robot.ik(&config, &ee_pose, &Isometry3::identity(), x0.to_vec()) {
             v.leak().as_ptr()
         } else {
             std::ptr::null()

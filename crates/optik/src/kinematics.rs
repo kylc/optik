@@ -113,14 +113,19 @@ impl KinematicChain {
     /// generalized position vector `q`.
     ///
     /// Panics of `q.len() != self.num_positions()`.
-    pub fn forward_kinematics(&self, q: &[f64]) -> ForwardKinematics {
+    pub fn forward_kinematics(&self, q: &[f64], ee_offset: &Isometry3<f64>) -> ForwardKinematics {
         let mut fk = ForwardKinematics::empty();
-        self.forward_kinematics_mut(q, &mut fk);
+        self.forward_kinematics_mut(q, ee_offset, &mut fk);
         fk
     }
 
     /// Like [`forward_kinematics()`], but mutate the given result in-place.
-    pub fn forward_kinematics_mut(&self, q: &[f64], fk: &mut ForwardKinematics) {
+    pub fn forward_kinematics_mut(
+        &self,
+        q: &[f64],
+        ee_offset: &Isometry3<f64>,
+        fk: &mut ForwardKinematics,
+    ) {
         assert_eq!(
             q.len(),
             self.num_positions(),
@@ -155,7 +160,7 @@ impl KinematicChain {
         fk.joint_tfms.clear();
         fk.joint_tfms.extend(joint_tfms);
 
-        fk.ee_tfm = *fk.joint_tfms.last().unwrap();
+        fk.ee_tfm = *fk.joint_tfms.last().unwrap() * ee_offset;
     }
 
     pub fn joint_jacobian(&self, fk: &ForwardKinematics) -> Matrix6xX<f64> {

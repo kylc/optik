@@ -18,7 +18,7 @@ fn test_invalid_seed() {
     let mut x0 = vec![0.0; 6];
     x0[4] = ub[4] + 1.0;
 
-    robot.ik(&config, &tfm_target, x0);
+    robot.ik(&config, &tfm_target, &Isometry3::identity(), x0);
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn test_stopping_maxtime() {
     };
 
     let start = Instant::now();
-    robot.ik(&config, &tfm_target, x0);
+    robot.ik(&config, &tfm_target, &Isometry3::identity(), x0);
     let end = Instant::now();
     let duration = end - start;
 
@@ -49,7 +49,9 @@ fn test_determinism() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let x_target: Vector6<f64> = rng.gen();
-    let tfm_target = robot.fk(x_target.as_slice()).ee_tfm();
+    let tfm_target = robot
+        .fk(x_target.as_slice(), &Isometry3::identity())
+        .ee_tfm();
 
     let config = SolverConfig {
         max_time: 0.0,
@@ -58,7 +60,12 @@ fn test_determinism() {
     };
     let x_sol = DVector::from(
         robot
-            .ik(&config, &tfm_target, vec![0.0; robot.num_positions()])
+            .ik(
+                &config,
+                &tfm_target,
+                &Isometry3::identity(),
+                vec![0.0; robot.num_positions()],
+            )
             .unwrap()
             .0,
     );
@@ -67,7 +74,12 @@ fn test_determinism() {
     for _ in 0..10 {
         let x_sol_i = DVector::from(
             robot
-                .ik(&config, &tfm_target, vec![0.0; robot.num_positions()])
+                .ik(
+                    &config,
+                    &tfm_target,
+                    &Isometry3::identity(),
+                    vec![0.0; robot.num_positions()],
+                )
                 .unwrap()
                 .0,
         );
@@ -92,15 +104,22 @@ fn test_solution_forward_backward() {
 
     for _ in 0..10 {
         let x_target: Vector6<f64> = rng.gen();
-        let tfm_target = robot.fk(x_target.as_slice()).ee_tfm();
+        let tfm_target = robot
+            .fk(x_target.as_slice(), &Isometry3::identity())
+            .ee_tfm();
 
         let x_sol = DVector::from(
             robot
-                .ik(&config, &tfm_target, vec![0.0; robot.num_positions()])
+                .ik(
+                    &config,
+                    &tfm_target,
+                    &Isometry3::identity(),
+                    vec![0.0; robot.num_positions()],
+                )
                 .unwrap()
                 .0,
         );
-        let tfm_sol = robot.fk(x_sol.as_slice()).ee_tfm();
+        let tfm_sol = robot.fk(x_sol.as_slice(), &Isometry3::identity()).ee_tfm();
 
         // NOTE: epsilon here isn't exactly the same as the epsilon we pass into
         // the solver since we're not comparing within the manifold here. I've
@@ -130,12 +149,29 @@ fn test_solution_quality() {
     for _ in 0..20 {
         let x0 = vec![0.0; robot.num_positions()];
         let x_target: Vector6<f64> = rng.gen();
-        let tfm_target = robot.fk(x_target.as_slice()).ee_tfm();
+        let tfm_target = robot
+            .fk(x_target.as_slice(), &Isometry3::identity())
+            .ee_tfm();
 
-        let sol_speed = DVector::from(robot.ik(&config_speed, &tfm_target, x0.clone()).unwrap().0);
+        let sol_speed = DVector::from(
+            robot
+                .ik(
+                    &config_speed,
+                    &tfm_target,
+                    &Isometry3::identity(),
+                    x0.clone(),
+                )
+                .unwrap()
+                .0,
+        );
         let sol_quality = DVector::from(
             robot
-                .ik(&config_quality, &tfm_target, x0.clone())
+                .ik(
+                    &config_quality,
+                    &tfm_target,
+                    &Isometry3::identity(),
+                    x0.clone(),
+                )
                 .unwrap()
                 .0,
         );

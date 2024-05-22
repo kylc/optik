@@ -1,5 +1,6 @@
 use std::{process, time::Instant};
 
+use nalgebra::Isometry3;
 use optik::*;
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -22,10 +23,10 @@ fn main() {
     for _ in 0..n {
         let x0 = robot.random_configuration(&mut rng);
         let q_target = robot.random_configuration(&mut rng);
-        let target_ee_pose = robot.fk(&q_target).ee_tfm();
+        let target_ee_pose = robot.fk(&q_target, &Isometry3::identity()).ee_tfm();
 
         let t0 = Instant::now();
-        if let Some((_, c)) = robot.ik(&config, &target_ee_pose, x0) {
+        if let Some((_, c)) = robot.ik(&config, &target_ee_pose, &Isometry3::identity(), x0) {
             let tf = Instant::now();
             t_tot += (tf - t0).as_micros();
             n_success += 1;

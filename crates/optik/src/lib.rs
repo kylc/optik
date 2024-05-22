@@ -87,14 +87,15 @@ impl Robot {
         self.chain.joint_jacobian(fk)
     }
 
-    pub fn fk(&self, q: &[f64]) -> ForwardKinematics {
-        self.chain.forward_kinematics(q)
+    pub fn fk(&self, q: &[f64], ee_offset: &Isometry3<f64>) -> ForwardKinematics {
+        self.chain.forward_kinematics(q, ee_offset)
     }
 
     pub fn ik(
         &self,
         config: &SolverConfig,
         tfm_target: &Isometry3<f64>,
+        ee_offset: &Isometry3<f64>,
         x0: Vec<f64>,
     ) -> Option<(Vec<f64>, f64)> {
         // Complain if the provided seed is out side the joint limits. The
@@ -163,7 +164,7 @@ impl Robot {
 
                             // Share kinematic results between the gradient and
                             // objective function evaluations, when possible.
-                            self.chain.forward_kinematics_mut(x, fk);
+                            self.chain.forward_kinematics_mut(x, ee_offset, fk);
 
                             // Compute the gradient only if it was requested by
                             // the optimizer.

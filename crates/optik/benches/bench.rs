@@ -19,7 +19,7 @@ fn bench_gradient(c: &mut Criterion) {
     let tfm_target = Isometry3::identity();
 
     c.bench_function("gradient", |b| {
-        let fk = robot.fk(&q);
+        let fk = robot.fk(&q, &Isometry3::identity());
         b.iter(|| {
             objective_grad(
                 &robot,
@@ -39,7 +39,7 @@ fn bench_objective(c: &mut Criterion) {
     let robot = load_benchmark_model();
 
     let q = robot.random_configuration(&mut rand::thread_rng());
-    let fk = robot.fk(&q);
+    let fk = robot.fk(&q, &Isometry3::identity());
     let tfm_target = Isometry3::identity();
     c.bench_function("objective", |b| {
         b.iter(|| {
@@ -58,14 +58,14 @@ fn bench_fk(c: &mut Criterion) {
     let robot = load_benchmark_model();
     let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
 
-    c.bench_function("fk", |b| b.iter(|| robot.fk(&x0)));
+    c.bench_function("fk", |b| b.iter(|| robot.fk(&x0, &Isometry3::identity())));
 }
 
 fn bench_joint_jacobian(c: &mut Criterion) {
     let robot = load_benchmark_model();
     let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
 
-    let fk = robot.fk(&x0);
+    let fk = robot.fk(&x0, &Isometry3::identity());
     c.bench_function("joint_jacobian", |b| b.iter(|| robot.joint_jacobian(&fk)));
 }
 
@@ -74,10 +74,19 @@ fn bench_ik(c: &mut Criterion) {
     let config = SolverConfig::default();
 
     let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
-    let tfm_target = robot.fk(&[-0.1, -0.2, 0.0, -0.3, 0.2, 1.1]).ee_tfm();
+    let tfm_target = robot
+        .fk(&[-0.1, -0.2, 0.0, -0.3, 0.2, 1.1], &Isometry3::identity())
+        .ee_tfm();
 
     c.bench_function("ik", |b| {
-        b.iter(|| robot.ik(&config, black_box(&tfm_target), x0.clone()))
+        b.iter(|| {
+            robot.ik(
+                &config,
+                black_box(&tfm_target),
+                &Isometry3::identity(),
+                x0.clone(),
+            )
+        })
     });
 }
 

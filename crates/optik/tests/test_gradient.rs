@@ -1,5 +1,5 @@
 use approx::assert_abs_diff_eq;
-use nalgebra::{vector, DVector, Vector6};
+use nalgebra::{vector, DVector, Isometry3, Vector6};
 use optik::{
     objective::{objective, objective_grad},
     Robot,
@@ -38,10 +38,10 @@ fn test_gradient_analytical_vs_numerical() {
     let angular_weight = vector![0.005, 1.0, 0.99];
 
     let mut rng = StdRng::seed_from_u64(42);
-    for i in 0..100 {
+    for _ in 0..100 {
         let x0: Vector6<f64> = rng.gen();
         let tfm_target = rng.gen();
-        let fk = robot.fk(x0.as_slice());
+        let fk = robot.fk(x0.as_slice(), &Isometry3::identity());
 
         // Analytical gradient
         let mut g_a = Vector6::zeros();
@@ -57,7 +57,7 @@ fn test_gradient_analytical_vs_numerical() {
         // Numerical gradient
         let g_n = finite_difference(
             |x| {
-                let fk = robot.fk(x);
+                let fk = robot.fk(x, &Isometry3::identity());
                 objective(&robot, &tfm_target, &fk, linear_weight, angular_weight)
             },
             x0.as_slice(),

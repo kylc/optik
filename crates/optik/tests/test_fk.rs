@@ -17,6 +17,10 @@ fn test_fk() {
 
     let robot = Robot::from_urdf_str(TEST_MODEL_STR, "ur_base_link", "ur_ee_link");
     for (input, output) in inputs.into_iter().zip(outputs) {
-        assert_abs_diff_eq!(robot.fk(&input).ee_tfm(), output, epsilon = 1e-6);
+        assert_abs_diff_eq!(
+            robot.fk(&input, &Isometry3::identity()).ee_tfm(),
+            output,
+            epsilon = 1e-6
+        );
     }
 }

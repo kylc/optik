@@ -5,6 +5,11 @@ use optik::{Robot, SolverConfig};
 use nalgebra::{Isometry3, Matrix4};
 use pyo3::prelude::*;
 
+fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
+    let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
+    nalgebra::try_convert(m).expect("invalid target transform specified")
+}
+
 #[pyclass]
 #[pyo3(name = "SolverConfig")]
 struct PySolverConfig(SolverConfig);
@@ -78,24 +83,24 @@ impl PyRobot {
         )
     }
 
-    fn joint_jacobian(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
+    fn joint_jacobian(&self, x: Vec<f64>, ee_offset: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
         assert_eq!(x.len(), robot.num_positions());
 
-        let fk = robot.fk(&x);
+        let fk = robot.fk(&x, &parse_pose(ee_offset));
         let jac = robot.joint_jacobian(&fk);
         jac.row_iter()
             .map(|row| row.iter().copied().collect())
             .collect()
     }
 
-    fn fk(&self, x: Vec<f64>) -> Vec<Vec<f64>> {
+    fn fk(&self, x: Vec<f64>, ee_offset: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
         assert_eq!(x.len(), robot.num_positions());
 
-        let ee_pose = robot.fk(&x).ee_tfm();
+        let ee_pose = robot.fk(&x, &parse_pose(ee_offset)).ee_tfm();
         ee_pose
             .to_matrix()
             .row_iter()
@@ -107,19 +112,16 @@ impl PyRobot {
         &self,
         config: &PySolverConfig,
         target: Vec<Vec<f64>>,
+        ee_offset: Vec<Vec<f64>>,
         x0: Vec<f64>,
     ) -> Option<(Vec<f64>, f64)> {
         let robot = &self.0;
 
         assert_eq!(x0.len(), self.num_positions());
 
-        fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
-            let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
-            nalgebra::try_convert(m).expect("invalid target transform specified")
-        }
-
         let target = parse_pose(target);
-        robot.ik(&config.0, &target, x0)
+        let ee_offset = parse_pose(ee_offset);
+        robot.ik(&config.0, &target, &ee_offset, x0)
     }
 }
 
