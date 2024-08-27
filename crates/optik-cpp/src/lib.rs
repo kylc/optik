@@ -156,6 +156,7 @@ extern "C" fn optik_robot_ik(
             angular_weight: std::slice::from_raw_parts((*config).angular_weight, 3)
                 .try_into()
                 .unwrap(),
+            joint_limits: None,
         };
         if let Some((v, _)) = robot.ik(&config, &ee_pose, &Isometry3::identity(), x0.to_vec()) {
             v.leak().as_ptr()
