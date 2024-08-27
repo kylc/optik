@@ -143,7 +143,7 @@ fn test_solution_quality() {
     };
     let config_quality = SolverConfig {
         solution_mode: SolutionMode::Quality,
-        ..config_speed
+        ..config_speed.clone()
     };
 
     for _ in 0..20 {

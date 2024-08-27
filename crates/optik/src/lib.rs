@@ -101,7 +101,10 @@ impl Robot {
         // Complain if the provided seed is out side the joint limits. The
         // solver may be able to handle this, but it seems likely that there is
         // a bug in the user's program if this occurs and we should notify them.
-        let (lb, ub) = self.joint_limits();
+        let (lb, ub) = match &config.joint_limits {
+            Some((lb, ub)) => (lb.clone(), ub.clone()),
+            None => self.joint_limits(),
+        };
         if x0.iter().enumerate().any(|(i, q)| *q < lb[i] || *q > ub[i]) {
             panic!("seed joint position outside of joint limits")
         }

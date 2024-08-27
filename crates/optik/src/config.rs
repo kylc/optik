@@ -47,6 +47,9 @@ pub struct SolverConfig {
 
     /// Scaling applied to the angular error in the base link frame.
     pub angular_weight: [f64; 3],
+
+    /// Joint limits, this is to specify joint configurations like elbow up/down
+    pub joint_limits: Option<(Vec<f64>, Vec<f64>)>,
 }
 
 impl Default for SolverConfig {
@@ -60,6 +63,7 @@ impl Default for SolverConfig {
             tol_dx: -1.0,
             linear_weight: [1.0; 3],
             angular_weight: [1.0; 3],
+            joint_limits: None,
         }
     }
 }

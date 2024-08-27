@@ -24,7 +24,8 @@ impl PySolverConfig {
                       tol_df=-1.0,
                       tol_dx=-1.0,
                       linear_weight=[1.0, 1.0, 1.0],
-                      angular_weight=[1.0, 1.0, 1.0]))]
+                      angular_weight=[1.0, 1.0, 1.0],
+                      joint_limits=None))]
     #[allow(clippy::too_many_arguments)]
     fn py_new(
         solution_mode: &str,
@@ -35,6 +36,7 @@ impl PySolverConfig {
         tol_dx: f64,
         linear_weight: [f64; 3],
         angular_weight: [f64; 3],
+        joint_limits: Option<(Vec<f64>, Vec<f64>)>,
     ) -> Self {
         let solution_mode = solution_mode.parse().expect("invalid solution mode");
 
@@ -51,6 +53,7 @@ impl PySolverConfig {
             tol_dx,
             linear_weight,
             angular_weight,
+            joint_limits,
         })
     }
 }
