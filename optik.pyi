@@ -1,5 +1,11 @@
 from typing import Literal
 
+import numpy as np
+import numpy.typing as npt
+
+VectorXd = list[float] | npt.NDArray[np.float64]
+MatrixXd = list[list[float]] | npt.NDArray[np.float64]
+
 class SolverConfig:
     def __init__(
         self,
@@ -9,8 +15,8 @@ class SolverConfig:
         tol_f: float = ...,
         tol_df: float = ...,
         tol_dx: float = ...,
-        linear_weight: list[float] = ...,
-        angular_weight: list[float] = ...,
+        linear_weight: VectorXd = ...,
+        angular_weight: VectorXd = ...,
     ): ...
 
 class Robot:
@@ -21,14 +27,14 @@ class Robot:
     def joint_limits(self) -> tuple[list[float], list[float]]: ...
     def joint_jacobian(
         self,
-        x: list[float],
-        ee_offset: list[list[float]],
+        x: VectorXd,
+        ee_offset: MatrixXd,
     ) -> list[list[float]]: ...
-    def fk(self, x: list[float], ee_offset: list[list[float]]) -> list[list[float]]: ...
+    def fk(self, x: VectorXd, ee_offset: MatrixXd) -> list[list[float]]: ...
     def ik(
         self,
         config: SolverConfig,
-        target: list[list[float]],
-        ee_offset: list[list[float]],
-        x0: list[float],
+        target: MatrixXd,
+        ee_offset: MatrixXd,
+        x0: VectorXd,
     ) -> tuple[list[float], float] | None: ...
