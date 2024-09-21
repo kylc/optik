@@ -42,9 +42,9 @@ jobs:
           pip3 install optik-py --no-index --find-links dist
           python3 -c "import optik"
       - name: upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-binary-${{ matrix.os }}-${{ matrix.target }}
           path: dist
       - if: github.ref == 'refs/heads/master'
         name: update prerelease tag
@@ -55,16 +55,16 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist --manifest-path crates/optik-py/Cargo.toml
       - name: upload sdist
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-sdist
           path: dist
 
   prerelease:
@@ -75,13 +75,14 @@ jobs:
       cancel-in-progress: true
     needs: [build_wheels, sdist]
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: wheels
+          pattern: wheels-*
+          merge-multiple: true
           path: wheels
 
       - name: GitHub release
-        uses: ncipollo/release-action@v1.12.0
+        uses: ncipollo/release-action@v1.14.0
         with:
           prerelease: true
           tag: "prerelease"
@@ -98,9 +99,10 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build_wheels, sdist]
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: wheels
+          pattern: wheels-*
+          merge-multiple: true
       - uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
