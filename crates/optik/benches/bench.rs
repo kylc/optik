@@ -83,8 +83,8 @@ fn bench_ik(c: &mut Criterion) {
             robot.ik(
                 &config,
                 black_box(&tfm_target),
-                &Isometry3::identity(),
                 x0.clone(),
+                &Isometry3::identity(),
             )
         })
     });

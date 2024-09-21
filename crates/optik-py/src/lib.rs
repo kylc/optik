@@ -5,9 +5,13 @@ use optik::{Robot, SolverConfig};
 use nalgebra::{Isometry3, Matrix4};
 use pyo3::prelude::*;
 
-fn parse_pose(v: Vec<Vec<f64>>) -> Isometry3<f64> {
-    let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
-    nalgebra::try_convert(m).expect("invalid target transform specified")
+fn parse_pose(v: Option<Vec<Vec<f64>>>) -> Isometry3<f64> {
+    if let Some(v) = v {
+        let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
+        nalgebra::try_convert(m).expect("invalid target transform specified")
+    } else {
+        Isometry3::identity()
+    }
 }
 
 #[pyclass]
@@ -83,7 +87,8 @@ impl PyRobot {
         )
     }
 
-    fn joint_jacobian(&self, x: Vec<f64>, ee_offset: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    #[pyo3(signature=(x, ee_offset=None))]
+    fn joint_jacobian(&self, x: Vec<f64>, ee_offset: Option<Vec<Vec<f64>>>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
         assert_eq!(x.len(), robot.num_positions());
@@ -95,7 +100,8 @@ impl PyRobot {
             .collect()
     }
 
-    fn fk(&self, x: Vec<f64>, ee_offset: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    #[pyo3(signature=(x, ee_offset=None))]
+    fn fk(&self, x: Vec<f64>, ee_offset: Option<Vec<Vec<f64>>>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
         assert_eq!(x.len(), robot.num_positions());
@@ -108,20 +114,21 @@ impl PyRobot {
             .collect()
     }
 
+    #[pyo3(signature=(config, target, x0, ee_offset=None))]
     fn ik(
         &self,
         config: &PySolverConfig,
         target: Vec<Vec<f64>>,
-        ee_offset: Vec<Vec<f64>>,
         x0: Vec<f64>,
+        ee_offset: Option<Vec<Vec<f64>>>,
     ) -> Option<(Vec<f64>, f64)> {
         let robot = &self.0;
 
         assert_eq!(x0.len(), self.num_positions());
 
-        let target = parse_pose(target);
+        let target = parse_pose(Some(target));
         let ee_offset = parse_pose(ee_offset);
-        robot.ik(&config.0, &target, &ee_offset, x0)
+        robot.ik(&config.0, &target, x0, &ee_offset)
     }
 }
 

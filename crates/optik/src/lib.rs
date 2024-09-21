@@ -95,8 +95,8 @@ impl Robot {
         &self,
         config: &SolverConfig,
         tfm_target: &Isometry3<f64>,
-        ee_offset: &Isometry3<f64>,
         x0: Vec<f64>,
+        ee_offset: &Isometry3<f64>,
     ) -> Option<(Vec<f64>, f64)> {
         // Complain if the provided seed is out side the joint limits. The
         // solver may be able to handle this, but it seems likely that there is

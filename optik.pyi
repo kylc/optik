@@ -28,13 +28,15 @@ class Robot:
     def joint_jacobian(
         self,
         x: VectorXd,
-        ee_offset: MatrixXd,
+        ee_offset: MatrixXd | None = ...,
     ) -> list[list[float]]: ...
-    def fk(self, x: VectorXd, ee_offset: MatrixXd) -> list[list[float]]: ...
+    def fk(
+        self, x: VectorXd, ee_offset: MatrixXd | None = ...
+    ) -> list[list[float]]: ...
     def ik(
         self,
         config: SolverConfig,
         target: MatrixXd,
-        ee_offset: MatrixXd,
         x0: VectorXd,
+        ee_offset: MatrixXd | None = ...,
     ) -> tuple[list[float], float] | None: ...

@@ -157,7 +157,7 @@ extern "C" fn optik_robot_ik(
                 .try_into()
                 .unwrap(),
         };
-        if let Some((v, _)) = robot.ik(&config, &ee_pose, &Isometry3::identity(), x0.to_vec()) {
+        if let Some((v, _)) = robot.ik(&config, &ee_pose, x0.to_vec(), &Isometry3::identity()) {
             v.leak().as_ptr()
         } else {
             std::ptr::null()

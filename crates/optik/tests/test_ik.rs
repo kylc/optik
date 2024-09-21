@@ -18,7 +18,7 @@ fn test_invalid_seed() {
     let mut x0 = vec![0.0; 6];
     x0[4] = ub[4] + 1.0;
 
-    robot.ik(&config, &tfm_target, &Isometry3::identity(), x0);
+    robot.ik(&config, &tfm_target, x0, &Isometry3::identity());
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn test_stopping_maxtime() {
     };
 
     let start = Instant::now();
-    robot.ik(&config, &tfm_target, &Isometry3::identity(), x0);
+    robot.ik(&config, &tfm_target, x0, &Isometry3::identity());
     let end = Instant::now();
     let duration = end - start;
 
@@ -63,8 +63,8 @@ fn test_determinism() {
             .ik(
                 &config,
                 &tfm_target,
-                &Isometry3::identity(),
                 vec![0.0; robot.num_positions()],
+                &Isometry3::identity(),
             )
             .unwrap()
             .0,
@@ -77,8 +77,8 @@ fn test_determinism() {
                 .ik(
                     &config,
                     &tfm_target,
-                    &Isometry3::identity(),
                     vec![0.0; robot.num_positions()],
+                    &Isometry3::identity(),
                 )
                 .unwrap()
                 .0,
@@ -113,8 +113,8 @@ fn test_solution_forward_backward() {
                 .ik(
                     &config,
                     &tfm_target,
-                    &Isometry3::identity(),
                     vec![0.0; robot.num_positions()],
+                    &Isometry3::identity(),
                 )
                 .unwrap()
                 .0,
@@ -158,8 +158,8 @@ fn test_solution_quality() {
                 .ik(
                     &config_speed,
                     &tfm_target,
-                    &Isometry3::identity(),
                     x0.clone(),
+                    &Isometry3::identity(),
                 )
                 .unwrap()
                 .0,
@@ -169,8 +169,8 @@ fn test_solution_quality() {
                 .ik(
                     &config_quality,
                     &tfm_target,
-                    &Isometry3::identity(),
                     x0.clone(),
+                    &Isometry3::identity(),
                 )
                 .unwrap()
                 .0,

@@ -46,12 +46,12 @@ settings.verbose = False
 
 q = q0
 for t in np.arange(0.0, 1.0, step=dt):
-    X_WE = np.array(robot.fk(q, ee_offset=np.eye(4)))
+    X_WE = np.array(robot.fk(q))
     R_WE = X_WE[:3, :3]
 
     # Use OptIK to compute the local frame Jacobian, and then rotate it to be
     # world-aligned since we specify our target velocity in the world frame.
-    JEq = np.array(robot.joint_jacobian(q, ee_offset=np.eye(4)))
+    JEq = np.array(robot.joint_jacobian(q))
     JWq = np.vstack(
         (
             R_WE @ JEq[:3, :],
@@ -96,6 +96,6 @@ for t in np.arange(0.0, 1.0, step=dt):
     print("qd*      = ", qd_star)
     print("V*       = ", V_star)
     print("|V* - V| = ", np.linalg.norm(V_star - V))
-    print("p_WE     =", np.array(robot.fk(q, ee_offset=np.eye(4)))[:3, 3])
+    print("p_WE     =", np.array(robot.fk(q))[:3, 3])
 
     print(f"Solve time: {int(1e6 * solution.solve_time)}µs")
