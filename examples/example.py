@@ -21,7 +21,7 @@ urdf_path, base_name, ee_name = sys.argv[1:4]
 robot = Robot.from_urdf_file(urdf_path, base_name, ee_name)
 config = SolverConfig()
 
-N = 10000
+N = 10_000
 
 total_time = 0
 for i in range(N):
@@ -31,19 +31,17 @@ for i in range(N):
     # Generate a target pose which is known to be valid, but don't tell the
     # optimizer anything about the joint angles we used to get there!
     q_target = np.random.uniform(*robot.joint_limits())
-    target_ee_pose = robot.fk(q_target)
+    target_ee_pose = np.array(robot.fk(q_target))
 
-    start = time.time()
+    t0 = time.time()
     sol = robot.ik(config, target_ee_pose, x0)
-    end = time.time()
+    tf = time.time()
 
     if sol is not None:
         q_opt, c = sol
 
-        target_ee_pose = np.reshape(target_ee_pose, (4, 4))
-        actual_ee_pose = np.reshape(robot.fk(q_opt), (4, 4))
+        total_time += tf - t0
+        print(f"Solve time: {1e6 * (tf - t0):.0f}µs (to {c=:.1e})")
 
-        total_time += end - start
-        print("Solve time: {}us (to {:.1e})".format(int(1e6 * (end - start)), c))
-
-print("Average time: {}us".format(int(1e6 * total_time / N)))
+avg_time = 1e6 * total_time / N
+print(f"Average time: {avg_time:.0f}µs")
