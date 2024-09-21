@@ -87,11 +87,13 @@ cmake --build .
 
 ## Application Notes
 
-- For workloads in which the distance between the solution and the seed are not important, you can use a high degree of parallelism (OptIK defaults to the number of CPU cores) to more quickly converge on a solution via parallel random restarting.
+- For workloads in which the distance between the solution and the seed are not important, you can use a high degree of parallelism to more quickly converge on a solution via parallel random restarting.
+    - OptIK defaults to the number of CPU cores for parallel solving. From testing (on an Intel i7-12700k), it has been observed that setting the parallelism level to half the logical core count generally gives the best results.
 
 - For workloads such as Cartesian interpolation, it is important to find the solution closest to the seed to avoid joint-space discontinuities. While OptIK does not explicitly try to minimize this distance, the optimizer does generally converge to the nearest solution (subject to joint limits). Prefer using `SolutionMode::Quality` with parallelism to sample many solutions and choose the one nearest the seed.
+    - Cartesian interpolation subject to joint constraints may be better served by [Differential Inverse Kinematics](https://manipulation.csail.mit.edu/pick.html#diff_ik_w_constraints). See the [Python example](examples/diff_ik.py) for more information.
 
-- For workloads in which determinism is important, consider using `SolutionMode::Quality`, settings a `max_restarts` value, and disabling the `max_time`. This ensures that the solution is not dependent on CPU processing speed. Due to careful seeding of RNGs inside the solver, solutions should be fully deterministic. Alternatively, use `SolutionMode::Speed` and set the parallel threads to `1`.
+- For workloads in which determinism is important, consider using `SolutionMode::Quality`, settings a `max_restarts` value, and disabling the `max_time`. This ensures that the solution is not dependent on CPU processing speed or non-deterministic thread racing. Due to careful seeding of RNGs inside the solver, solutions should be fully deterministic. Alternatively, use `SolutionMode::Speed` and set the parallel threads to `1`.
 
 ## References
 
