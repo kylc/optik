@@ -91,7 +91,7 @@ impl PyRobot {
     fn joint_jacobian(&self, x: Vec<f64>, ee_offset: Option<Vec<Vec<f64>>>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
-        assert_eq!(x.len(), robot.num_positions());
+        assert_eq!(x.len(), robot.num_positions(), "len(x0) != num_positions");
 
         let fk = robot.fk(&x, &parse_pose(ee_offset));
         let jac = robot.joint_jacobian(&fk);
@@ -104,7 +104,7 @@ impl PyRobot {
     fn fk(&self, x: Vec<f64>, ee_offset: Option<Vec<Vec<f64>>>) -> Vec<Vec<f64>> {
         let robot = &self.0;
 
-        assert_eq!(x.len(), robot.num_positions());
+        assert_eq!(x.len(), robot.num_positions(), "len(x0) != num_positions");
 
         let ee_pose = robot.fk(&x, &parse_pose(ee_offset)).ee_tfm();
         ee_pose
@@ -124,7 +124,7 @@ impl PyRobot {
     ) -> Option<(Vec<f64>, f64)> {
         let robot = &self.0;
 
-        assert_eq!(x0.len(), self.num_positions());
+        assert_eq!(x0.len(), self.num_positions(), "len(x0) != num_positions");
 
         let target = parse_pose(Some(target));
         let ee_offset = parse_pose(ee_offset);
