@@ -76,7 +76,7 @@ git clone git@github.com:kylc/optik.git
 cargo build --release
 
 # Build a Python wheel
-maturin build --release -m crates/optik-py/Cargo.toml
+pip wheel .
 
 # Build the C++ example
 mkdir build
