@@ -18,10 +18,10 @@ jobs:
             target: aarch64
             cross: true
           - os: macos-13
-            target: x86_64
+            target: universal2
             cross: false
           - os: macos-14
-            target: aarch64
+            target: universal2
             cross: false
 
     steps:
