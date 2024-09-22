@@ -13,10 +13,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64
+            cross: false
+          - os: ubuntu-latest
+            target: aarch64
+            cross: true
           - os: macos-13
             target: x86_64
+            cross: false
           - os: macos-14
             target: aarch64
+            cross: false
 
     steps:
       - name: checkout
@@ -39,6 +45,7 @@ jobs:
           pip3 install delocate
           delocate-wheel -v dist/*.whl
       - name: install built wheel
+        if: ${{ ! matrix.cross }}
         run: |
           pip3 install optik-py --no-index --find-links dist
           python3 -c "import optik"
