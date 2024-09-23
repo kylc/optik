@@ -53,7 +53,7 @@ jobs:
           path: dist
       - if: github.ref == 'refs/heads/master'
         name: update prerelease tag
-        uses: EndBug/latest-tag@v1.6.1
+        uses: EndBug/latest-tag@v1.6.2
         with:
           ref: "prerelease"
 
