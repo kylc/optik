@@ -17,9 +17,6 @@ jobs:
           - os: ubuntu-latest
             target: aarch64
             cross: true
-          - os: macos-13
-            target: universal2
-            cross: false
           - os: macos-14
             target: universal2
             cross: false
