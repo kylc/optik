@@ -1,5 +1,5 @@
 use approx::assert_abs_diff_eq;
-use nalgebra::{Isometry3, Matrix3, Matrix6, Vector3, Vector6};
+use nalgebra::{Isometry3, Matrix3, Matrix6, UnitQuaternion, Vector3, Vector6};
 use optik::math;
 
 // Various test cases for math operations. Ground truth is taken from equivalent
@@ -19,6 +19,14 @@ fn test_so3_log() {
     for (input, output) in inputs.into_iter().zip(outputs) {
         assert_abs_diff_eq!(math::so3::log(&input.rotation), output, epsilon = 1e-6);
     }
+}
+
+#[test]
+fn test_so3_log_singularity() {
+    let input = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), 0.0);
+    let output = Vector3::zeros();
+
+    assert_abs_diff_eq!(math::so3::log(&input), output, epsilon = 1e-6);
 }
 
 #[test]
