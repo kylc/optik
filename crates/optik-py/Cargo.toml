@@ -11,12 +11,12 @@ name = "optik"
 crate-type = ["cdylib"]
 
 [build-dependencies]
-pyo3-build-config = "0.22"
+pyo3-build-config = "0.23"
 
 [dependencies]
 nalgebra = "0.33"
 optik = { path = "../optik" }
-pyo3 = { version = "0.22", features = ["abi3-py38"] }
+pyo3 = { version = "0.23", features = ["abi3-py38"] }
 
 [features]
 extension-module = ["pyo3/extension-module"]
