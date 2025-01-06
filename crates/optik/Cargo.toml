@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 nalgebra = "0.33"
 nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"
-petgraph = "0.6"
+petgraph = "0.7"
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.10"
