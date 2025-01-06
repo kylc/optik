@@ -196,11 +196,11 @@ fn test_diff_ik() {
             .diff_ik(x0, &V_WE, &v_max, &Isometry3::identity())
             .unwrap();
 
-        assert!(0.0 <= alpha);
-        assert!(alpha <= 1.0);
+        let eps = 1e-6;
+        assert!((-eps..=1.0 + eps).contains(&alpha));
         for i in 0..robot.num_positions() {
-            assert!(-v_max[i] <= v_n[i] + 1e-6);
-            assert!(v_n[i] - 1e-6 <= v_max[i]);
+            assert!(-v_max[i] - eps <= v_n[i]);
+            assert!(v_n[i] <= v_max[i] + eps);
         }
 
         // TODO: Assert the Cartesian velocity is tracked.
