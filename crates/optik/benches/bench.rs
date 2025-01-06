@@ -71,6 +71,22 @@ fn bench_joint_jacobian(c: &mut Criterion) {
     c.bench_function("joint_jacobian", |b| b.iter(|| robot.joint_jacobian(&fk)));
 }
 
+fn bench_diff_ik(c: &mut Criterion) {
+    let robot = load_benchmark_model();
+
+    let x0 = vec![0.1, 0.2, 0.0, 0.3, -0.2, -1.1];
+    let v_max = vec![1.0; 6];
+    let v = vector![0.1, 0.2, 0.3, -0.1, -0.2, -0.3];
+
+    c.bench_function("diff_ik", |b| {
+        b.iter(|| {
+            let res = robot.diff_ik(x0.clone(), black_box(&v), &v_max, &Isometry3::identity());
+            assert_ne!(res, None);
+            res
+        })
+    });
+}
+
 fn bench_ik(c: &mut Criterion) {
     let robot = load_benchmark_model();
     let config = SolverConfig::default();
@@ -97,6 +113,7 @@ criterion_group!(
     bench_gradient,
     bench_objective,
     bench_fk,
+    bench_diff_ik,
     bench_joint_jacobian,
     bench_ik
 );

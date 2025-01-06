@@ -10,6 +10,9 @@ rust-version.workspace = true
 name = "optikcpp"
 crate-type = ["staticlib"]
 
+[lints]
+workspace = true
+
 [dependencies]
 nalgebra.workspace = true
 optik.workspace = true

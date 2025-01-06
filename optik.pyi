@@ -40,3 +40,10 @@ class Robot:
         x0: VectorXd,
         ee_offset: MatrixXd | None = ...,
     ) -> tuple[list[float], float] | None: ...
+    def diff_ik(
+        self,
+        x0: VectorXd,
+        V_WE: VectorXd,
+        v_max: VectorXd,
+        ee_offset: MatrixXd | None = ...,
+    ) -> tuple[float, list[float]] | None: ...

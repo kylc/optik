@@ -17,6 +17,7 @@ rust-version = "1.85"
 optik = { path = "crates/optik" }
 
 # Solver
+clarabel = "0.11"
 nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "main", features = [ "rand", "serde-serialize" ] }
 nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"

@@ -10,7 +10,11 @@ rust-version.workspace = true
 name = "optik"
 crate-type = ["rlib"]
 
+[lints]
+workspace = true
+
 [dependencies]
+clarabel.workspace = true
 nalgebra.workspace = true
 nlopt.workspace = true
 ordered-float.workspace = true

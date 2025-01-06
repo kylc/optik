@@ -3,7 +3,7 @@ use std::{
     mem,
 };
 
-use nalgebra::{DMatrix, Isometry3, Translation3, UnitQuaternion};
+use nalgebra::{DMatrix, Isometry3, Translation3, UnitQuaternion, Vector6};
 
 use optik::{Robot, SolutionMode, SolverConfig};
 
@@ -155,6 +155,27 @@ extern "C" fn optik_robot_ik(
         };
         if let Some((v, _)) = robot.ik(&config, &ee_pose, x0.to_vec(), &Isometry3::identity()) {
             v.leak().as_ptr()
+        } else {
+            std::ptr::null()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn optik_robot_diff_ik(
+    robot: *const Robot,
+    x0: *const c_double,
+    V_WE: *const c_double,
+    v_max: *const c_double,
+) -> *const c_double {
+    unsafe {
+        let robot = robot.as_ref().unwrap();
+        let x0 = std::slice::from_raw_parts(x0, robot.num_positions()).to_vec();
+        let V_WE = Vector6::from_row_slice(std::slice::from_raw_parts(V_WE, 6));
+        let v_max = std::slice::from_raw_parts(v_max, robot.num_positions());
+
+        if let Some((_alpha, v_n)) = robot.diff_ik(x0, &V_WE, v_max, &Isometry3::identity()) {
+            v_n.leak().as_ptr()
         } else {
             std::ptr::null()
         }

@@ -25,6 +25,9 @@ extern double* optik_robot_fk(const optik::detail::robot* robot,
 extern double* optik_robot_ik(const optik::detail::robot* robot,
                               const optik::SolverConfig* config,
                               const double* target, const double* x0);
+extern double* optik_robot_diff_ik(const optik::detail::robot* robot,
+                                   const double* x0, const double* V_WE,
+                                   const double* v_max);
 }
 
 namespace optik {
@@ -110,6 +113,20 @@ bool Robot::DoIk(const SolverConfig& config, const Eigen::Isometry3d& target,
   if (q_data != nullptr) {
     *q = Eigen::Map<Eigen::VectorXd>(q_data, num_positions());
     free(q_data);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Robot::DoDiffIk(const Eigen::VectorXd& x0,
+                     const Eigen::Matrix<double, 6, 1>& V_WE,
+                     const Eigen::VectorXd& v_max, Eigen::VectorXd* v) const {
+  double* v_data =
+      optik_robot_diff_ik(inner_, x0.data(), V_WE.data(), v_max.data());
+  if (v_data != nullptr) {
+    *v = Eigen::Map<Eigen::VectorXd>(v_data, num_positions());
+    free(v_data);
     return true;
   } else {
     return false;

@@ -84,6 +84,15 @@ class Robot final {
   bool DoIk(const SolverConfig& config, const Eigen::Isometry3d& target,
             const Eigen::VectorXd& x0, Eigen::VectorXd* q) const;
 
+  //! Attempts to solve for the velocity `v` which satisfies `v * J(q) = V_WE`.
+  //!
+  //! If `true` is returned, then out-parameter `v` will contain the solution
+  //! joint velocity. Otherwise, the solve has not converged and `v` will be
+  //! left untouched.
+  bool DoDiffIk(const Eigen::VectorXd& x0,
+                const Eigen::Matrix<double, 6, 1>& V_WE,
+                const Eigen::VectorXd& v_max, Eigen::VectorXd* v) const;
+
   //! Returns the size of the generalized position vector of this robot.
   unsigned int num_positions() const noexcept;
 

@@ -7,7 +7,14 @@ use std::{
     time::Instant,
 };
 
-use nalgebra::{DVectorView, Isometry3, Matrix6xX, Vector3};
+use clarabel::{
+    algebra::{BlockConcatenate, CscMatrix},
+    solver::{
+        DefaultSettingsBuilder, DefaultSolver, IPSolver, SolverStatus,
+        SupportedConeT::{self, NonnegativeConeT, ZeroConeT},
+    },
+};
+use nalgebra::{DVectorView, Isometry3, Matrix6xX, Vector3, Vector6, stack};
 use nlopt::{Algorithm, Nlopt, SuccessState, Target};
 use ordered_float::OrderedFloat;
 use rand::SeedableRng;
@@ -89,6 +96,146 @@ impl Robot {
 
     pub fn fk(&self, q: &[f64], ee_offset: &Isometry3<f64>) -> ForwardKinematics {
         self.chain.forward_kinematics(q, ee_offset)
+    }
+
+    /// Given a desired end-effector frame velocity Vᴱ, attempt to solve for the
+    /// corresponding joint velocity v = [Jᴱ(q)]⁻¹Vᴱ. However, because the robot
+    /// may be joint velocity limited, an exact solution may not be possible.
+    ///
+    /// We therefore formulate the following optimization problem (as in [1]):
+    ///
+    ///   max_{vₙ, α} α
+    ///     s.t.
+    ///       # A scaling factor for how much to move in the desired direction.
+    ///       # We attempt to maximize this in the interval (0, 1), i.e. move as
+    ///       # far as we can.
+    ///       0 ≤ α ≤ 1
+    ///       # Apply symmetric jointspace velocity limits.
+    ///       -vmax ≤ vₙ ≤ vmax
+    ///       # Movement is only allowed in the direction of the desired
+    ///       # end-effector frame velocity.
+    ///       Jᴱ(q)vₙ = αVᴱ
+    ///
+    /// If a solution is found, returns a tuple of the alpha scaling factor and
+    /// the resulting joint velocities. Otherwise, returns None.
+    ///
+    /// [1]: https://manipulation.csail.mit.edu/pick.html#section6
+    pub fn diff_ik(
+        &self,
+        x0: Vec<f64>,
+        V_WE: &Vector6<f64>,
+        v_max: &[f64],
+        ee_offset: &Isometry3<f64>,
+    ) -> Option<(f64, Vec<f64>)> {
+        let n = self.num_positions();
+
+        // Appends the following constraint:
+        // 0 ≤ α ≤ 1.
+        let append_alpha_constraints =
+            |A: &mut CscMatrix<f64>, b: &mut Vec<f64>, K: &mut Vec<SupportedConeT<f64>>| {
+                let mut A_ext = CscMatrix::zeros((2, A.n));
+
+                // α ≤ 1.0
+                // α + s = 1.0, s ≥ 0
+                A_ext.set_entry((0, n), 1.0);
+                b.push(1.0);
+                K.push(NonnegativeConeT(1));
+
+                // α >= 0
+                // -α + s = 0.0, s ≥ 0
+                A_ext.set_entry((1, n), -1.0);
+                b.push(0.0);
+                K.push(NonnegativeConeT(1));
+
+                *A = CscMatrix::vcat(A, &A_ext).unwrap();
+            };
+
+        // Appends the following constraint:
+        // -vₘₐₓ ≤ vₙ ≤ vₘₐₓ
+        let append_velocity_constraints =
+            |A: &mut CscMatrix<f64>, b: &mut Vec<f64>, K: &mut Vec<SupportedConeT<f64>>| {
+                let mut A_ext = CscMatrix::zeros((2 * n, A.n));
+
+                for i in 0..n {
+                    // vᵢ ≤ vₘₐₓ
+                    // vᵢ + s = vₘₐₓ, s ≥ 0
+                    A_ext.set_entry((i * 2, i), 1.0);
+                    b.push(v_max[i]);
+                    K.push(NonnegativeConeT(1));
+
+                    // vᵢ ≥ -vₘₐₓ
+                    // -vᵢ + s = vₘₐₓ, s ≥ 0
+                    A_ext.set_entry((i * 2 + 1, i), -1.0);
+                    b.push(v_max[i]);
+                    K.push(NonnegativeConeT(1));
+                }
+
+                *A = CscMatrix::vcat(A, &A_ext).unwrap();
+            };
+
+        // Appends the following constraint:
+        // Jᴱ(q)vₙ = αVᴱ
+        let append_cartesian_constraints =
+            |A: &mut CscMatrix<f64>, b: &mut Vec<f64>, K: &mut Vec<SupportedConeT<f64>>| {
+                let fk = self.fk(&x0, ee_offset);
+
+                // Rotate the local frame end-effector Jacobian into the world frame to
+                // match the input velocity frame.
+                let R_WE = fk.ee_tfm().rotation.to_rotation_matrix();
+                let JEq = self.joint_jacobian(&fk);
+                let JEq_W = stack![
+                     R_WE * JEq.fixed_rows::<3>(0);
+                     R_WE * JEq.fixed_rows::<3>(3)
+                ];
+
+                // Jᴱ(q)vₙ = αVᴱ
+                let A_ext = CscMatrix::from(stack![JEq_W, -V_WE].row_iter());
+                b.extend(vec![0.0; n]);
+                K.push(ZeroConeT(n));
+
+                *A = CscMatrix::vcat(A, &A_ext).unwrap();
+            };
+
+        // Solve
+        //   min 0.5 xᵀPx + qᵀx
+        //     s.t.
+        //       Ax + s = b
+        //       s ∈ K
+        let P = CscMatrix::zeros((n + 1, n + 1));
+        let mut q = vec![0.0; n + 1];
+        q[n] = -100.0; // Reward large alpha values.
+
+        let mut A = CscMatrix::zeros((0, n + 1));
+        let mut b = vec![];
+        let mut K = vec![];
+
+        append_alpha_constraints(&mut A, &mut b, &mut K);
+        append_velocity_constraints(&mut A, &mut b, &mut K);
+        append_cartesian_constraints(&mut A, &mut b, &mut K);
+
+        let mut solver = DefaultSolver::new(
+            &P,
+            &q,
+            &A,
+            &b,
+            &K,
+            DefaultSettingsBuilder::default()
+                .verbose(false)
+                .build()
+                .unwrap(),
+        )
+        .expect("solver initialization failed");
+        solver.solve();
+
+        let solution = solver.solution;
+        match solution.status {
+            SolverStatus::Solved => {
+                let x = solution.x[0..n].to_vec();
+                let alpha = solution.x[n];
+                Some((alpha, x))
+            }
+            _ => None,
+        }
     }
 
     pub fn ik(
