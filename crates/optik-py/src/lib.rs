@@ -2,7 +2,7 @@
 
 use optik::{Robot, SolverConfig};
 
-use nalgebra::{Isometry3, Matrix4};
+use nalgebra::{Isometry3, Matrix4, Vector6};
 use pyo3::prelude::*;
 
 fn parse_pose(v: Option<Vec<Vec<f64>>>) -> Isometry3<f64> {
@@ -129,6 +129,28 @@ impl PyRobot {
         let target = parse_pose(Some(target));
         let ee_offset = parse_pose(ee_offset);
         robot.ik(&config.0, &target, x0, &ee_offset)
+    }
+
+    #[pyo3(signature=(x0, V_WE, v_max, ee_offset=None))]
+    fn diff_ik(
+        &self,
+        x0: Vec<f64>,
+        V_WE: Vec<f64>,
+        v_max: Vec<f64>,
+        ee_offset: Option<Vec<Vec<f64>>>,
+    ) -> Option<(f64, Vec<f64>)> {
+        let robot = &self.0;
+
+        assert_eq!(x0.len(), self.num_positions(), "len(x0) != num_positions");
+        assert_eq!(
+            v_max.len(),
+            self.num_positions(),
+            "len(v_max) != num_positions"
+        );
+
+        let V_WE = Vector6::from_row_slice(&V_WE);
+        let ee_offset = parse_pose(ee_offset);
+        robot.diff_ik(x0, &V_WE, &v_max, &ee_offset)
     }
 }
 
