@@ -10,7 +10,11 @@ rust-version.workspace = true
 name = "optik"
 crate-type = ["rlib"]
 
+[lints]
+workspace = true
+
 [dependencies]
+clarabel = "0.9"
 nalgebra = "0.33"
 nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"

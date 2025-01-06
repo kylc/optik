@@ -13,6 +13,9 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 rust-version = "1.80"
 
+[workspace.lints.rust]
+non_snake_case = "allow"
+
 [profile.release]
 lto = "fat"
 codegen-units = 1

@@ -180,3 +180,29 @@ fn test_solution_quality() {
         assert!(sol_quality.metric_distance(&x0) <= sol_speed.metric_distance(&x0));
     }
 }
+
+#[test]
+fn test_diff_ik() {
+    let robot = Robot::from_urdf_str(TEST_MODEL_STR, "ur_base_link", "ur_ee_link");
+
+    let mut rng = StdRng::seed_from_u64(42);
+
+    for _ in 0..20 {
+        let x0 = robot.random_configuration(&mut rng);
+        let v_max = vec![1.0; 6];
+        let V_WE = rng.gen::<Vector6<_>>();
+
+        let (alpha, v_n) = robot
+            .diff_ik(x0, &V_WE, &v_max, &Isometry3::identity())
+            .unwrap();
+
+        assert!(0.0 <= alpha);
+        assert!(alpha <= 1.0);
+        for i in 0..robot.num_positions() {
+            assert!(-v_max[i] <= v_n[i] + 1e-6);
+            assert!(v_n[i] - 1e-6 <= v_max[i]);
+        }
+
+        // TODO: Assert the Cartesian velocity is tracked.
+    }
+}
