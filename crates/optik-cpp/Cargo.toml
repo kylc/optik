@@ -11,6 +11,6 @@ name = "optikcpp"
 crate-type = ["staticlib"]
 
 [dependencies]
-nalgebra = "0.33"
-optik = { path = "../optik" }
-rand = "0.8"
+nalgebra.workspace = true
+optik.workspace = true
+rand.workspace = true

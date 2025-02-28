@@ -14,9 +14,9 @@ crate-type = ["cdylib"]
 pyo3-build-config = "0.23"
 
 [dependencies]
-nalgebra = "0.33"
-optik = { path = "../optik" }
-pyo3 = { version = "0.23", features = ["abi3-py38"] }
+nalgebra.workspace = true
+optik.workspace = true
+pyo3.workspace = true
 
 [features]
 extension-module = ["pyo3/extension-module"]
