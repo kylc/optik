@@ -5,6 +5,9 @@ on: [push, pull_request, workflow_dispatch]
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 jobs:
   build_wheels:
     runs-on: ${{ matrix.os }}
