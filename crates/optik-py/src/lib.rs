@@ -2,13 +2,26 @@
 
 use optik::{Robot, SolverConfig};
 
-use nalgebra::{Isometry3, Matrix4};
+use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Quaternion};
 use pyo3::prelude::*;
 
 fn parse_pose(v: Option<Vec<Vec<f64>>>) -> Isometry3<f64> {
     if let Some(v) = v {
         let m = Matrix4::from_iterator(v.into_iter().flatten()).transpose();
         nalgebra::try_convert(m).expect("invalid target transform specified")
+    } else {
+        Isometry3::identity()
+    }
+}
+
+fn pose_to_isometry(v: Option<Vec<f64>>) -> Isometry3<f64> {
+    // v is already [px, py, pz, qw, qx, qy, qz]
+
+    if let Some(v) = v {
+        Isometry3::from_parts(
+            Translation3::new(v[0], v[1], v[2]),
+            UnitQuaternion::from_quaternion(Quaternion::new(v[3], v[4], v[5], v[6])),
+        )
     } else {
         Isometry3::identity()
     }
@@ -114,6 +127,31 @@ impl PyRobot {
             .collect()
     }
 
+
+    #[pyo3(signature=(x, ee_offset=None))]
+    fn fk_medra(&self, x: Vec<f64>, ee_offset: Option<Vec<f64>>) -> Vec<f64> {
+        let robot = &self.0;
+
+        assert_eq!(x.len(), robot.num_positions(), "len(x0) != num_positions");
+
+        let ee_pose = robot.fk(&x, &pose_to_isometry(ee_offset)).ee_tfm();
+
+        let translation = ee_pose.translation.vector;
+        let rotation = ee_pose.rotation;
+        let quat = rotation.quaternion();
+
+        vec![
+            translation.x,
+            translation.y,
+            translation.z,
+            quat.w,
+            quat.i,
+            quat.j,
+            quat.k,
+        ]
+    }
+
+
     #[pyo3(signature=(config, target, x0, ee_offset=None))]
     fn ik(
         &self,
@@ -128,6 +166,23 @@ impl PyRobot {
 
         let target = parse_pose(Some(target));
         let ee_offset = parse_pose(ee_offset);
+        robot.ik(&config.0, &target, x0, &ee_offset)
+    }
+
+    #[pyo3(signature=(config, target_pose, x0, ee_offset_pose=None))]
+    fn ik_medra(
+        &self,
+        config: &PySolverConfig,
+        target_pose: Vec<f64>,
+        x0: Vec<f64>,
+        ee_offset_pose: Option<Vec<f64>>,
+    ) -> Option<(Vec<f64>, f64)> {
+        let robot = &self.0;
+
+        assert_eq!(x0.len(), self.num_positions(), "len(x0) != num_positions");
+
+        let target = pose_to_isometry(Some(target_pose));
+        let ee_offset = pose_to_isometry(ee_offset_pose);
         robot.ik(&config.0, &target, x0, &ee_offset)
     }
 }

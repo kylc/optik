@@ -33,10 +33,20 @@ class Robot:
     def fk(
         self, x: VectorXd, ee_offset: MatrixXd | None = ...
     ) -> list[list[float]]: ...
+    def fk_medra(
+        self, x: VectorXd, ee_offset: VectorXd | None = ...
+    ) -> list[float]: ...
     def ik(
         self,
         config: SolverConfig,
         target: MatrixXd,
         x0: VectorXd,
         ee_offset: MatrixXd | None = ...,
+    ) -> tuple[list[float], float] | None: ...
+    def ik_medra(
+        self,
+        config: SolverConfig,
+        target_pose: VectorXd,
+        x0: VectorXd,
+        ee_offset_pose: VectorXd | None = ...,
     ) -> tuple[list[float], float] | None: ...

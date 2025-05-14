@@ -464,7 +464,7 @@ checksum = "b410bbe7e14ab526a0e86877eb47c6996a2bd7746f027ba551028c925390e4e9"
 
 [[package]]
 name = "optik"
-version = "0.5.0-beta.4"
+version = "0.5.0-beta.5+medra"
 dependencies = [
  "approx",
  "criterion",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "optik-cpp"
-version = "0.5.0-beta.4"
+version = "0.5.0-beta.5+medra"
 dependencies = [
  "nalgebra",
  "optik",
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "optik-py"
-version = "0.5.0-beta.4"
+version = "0.5.0-beta.5+medra"
 dependencies = [
  "nalgebra",
  "optik",
