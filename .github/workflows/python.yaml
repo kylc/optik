@@ -51,7 +51,7 @@ jobs:
         with:
           name: wheels-binary-${{ matrix.os }}-${{ matrix.target }}
           path: dist
-      - if: github.ref == 'refs/heads/master'
+      - if: github.ref == 'refs/heads/main'
         name: update prerelease tag
         uses: EndBug/latest-tag@v1.6.2
         with:
@@ -73,7 +73,7 @@ jobs:
           path: dist
 
   prerelease:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
       group: push-${{ github.ref_name }}-prerelease
