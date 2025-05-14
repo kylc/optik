@@ -7,10 +7,12 @@ use std::{
     time::Instant,
 };
 
-use nalgebra::{DVectorView, Isometry3, Matrix6xX, Vector3};
+use nalgebra::{
+    DVectorView, Isometry3, Matrix6xX, Translation3, UnitQuaternion, UnitVector3, Vector3,
+};
 use nlopt::{Algorithm, Nlopt, SuccessState, Target};
 use ordered_float::OrderedFloat;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
@@ -265,5 +267,53 @@ impl Robot {
                 }
             }
         })
+    }
+
+    pub fn apply_angle_between_two_vectors_constraint(
+        &self,
+        source_vector_tip_frame: UnitVector3<f64>,
+        target_vector: UnitVector3<f64>,
+        max_angle: f64,
+        ee_transform: Isometry3<f64>,
+        mut seed_joint_angles: Vec<f64>,
+        config: &SolverConfig,
+    ) -> Option<Vec<f64>> {
+        // apply joint limits to seed joint angles
+        let joint_limits = self.joint_limits();
+        for index in 0..seed_joint_angles.len() {
+            let joint_angle = seed_joint_angles[index];
+            if joint_angle < joint_limits.0[index] {
+                seed_joint_angles[index] = joint_limits.0[index]
+            } else if joint_angle > joint_limits.1[index] {
+                seed_joint_angles[index] = joint_limits.1[index]
+            }
+        }
+        // calculate axis and angle of rotation
+        let robot_pose: Isometry3<f64> = self.fk(&seed_joint_angles, &ee_transform).ee_tfm();
+        let source_vector = robot_pose.transform_vector(&source_vector_tip_frame);
+        let axis_of_rotation: Vector3<f64> = source_vector.cross(&target_vector);
+        let angle_between_vectors: f64 = source_vector.dot(&target_vector).clamp(-1.0, 1.0).acos();
+        if angle_between_vectors < max_angle {
+            return Some(seed_joint_angles);
+        };
+        // Project the source vector into the valid cone
+        const RNG_SEED: u64 = 42;
+        let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
+        let angle_of_rotation =
+            rng.gen_range(angle_between_vectors - max_angle..angle_between_vectors);
+        let rotation_onto_cone: Isometry3<f64> = Isometry3::from_parts(
+            Translation3::new(0., 0., 0.),
+            UnitQuaternion::from_axis_angle(
+                &UnitVector3::new_normalize(axis_of_rotation),
+                angle_of_rotation,
+            ),
+        );
+        let target_pose = rotation_onto_cone * robot_pose;
+        // run ik to find joint angles that match the projected pose
+        let ik_solution = self.ik(&config, &target_pose, seed_joint_angles, &ee_transform);
+        match ik_solution {
+            Some(ik_solution) => return Some(ik_solution.0),
+            None => return None,
+        };
     }
 }

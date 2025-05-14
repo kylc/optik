@@ -50,3 +50,13 @@ class Robot:
         x0: VectorXd,
         ee_offset_pose: VectorXd | None = ...,
     ) -> tuple[list[float], float] | None: ...
+
+    def apply_angle_between_two_vectors_constraint(
+        self,
+        source_vec_in_tip_frame: VectorXd,
+        target_vec: VectorXd,
+        max_angle: float,
+        ee_offset_pose: VectorXd,
+        seed_joint_angles: VectorXd,
+        config: SolverConfig,
+    ) -> list[float] | None: ...
