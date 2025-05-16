@@ -31,6 +31,7 @@ use objective::*;
 pub struct Robot {
     chain: KinematicChain,
     thread_pool: ThreadPool,
+    rng: ChaCha8Rng,
 }
 
 impl Robot {
@@ -38,6 +39,7 @@ impl Robot {
         Self {
             chain,
             thread_pool: ThreadPoolBuilder::default().build().unwrap(),
+            rng: ChaCha8Rng::seed_from_u64(42),
         }
     }
 
@@ -269,8 +271,12 @@ impl Robot {
         })
     }
 
+    pub fn initialize_rng(&mut self, seed: u64){
+        self.rng = ChaCha8Rng::seed_from_u64(seed);
+    }
+
     pub fn apply_angle_between_two_vectors_constraint(
-        &self,
+        &mut self,
         source_vector_tip_frame: UnitVector3<f64>,
         target_vector: UnitVector3<f64>,
         max_angle: f64,
@@ -297,10 +303,8 @@ impl Robot {
             return Some(seed_joint_angles);
         };
         // Project the source vector into the valid cone
-        const RNG_SEED: u64 = 42;
-        let mut rng = ChaCha8Rng::seed_from_u64(RNG_SEED);
         let angle_of_rotation =
-            rng.gen_range(angle_between_vectors - max_angle..angle_between_vectors);
+            self.rng.gen_range(angle_between_vectors - max_angle..angle_between_vectors);
         let rotation_onto_cone: Isometry3<f64> = Isometry3::from_parts(
             Translation3::new(0., 0., 0.),
             UnitQuaternion::from_axis_angle(

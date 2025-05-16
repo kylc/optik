@@ -202,9 +202,14 @@ impl PyRobot {
         robot.ik(&config.0, &target, x0, &ee_offset)
     }
 
+    #[pyo3(signature=(seed))]
+    fn initalize_rng(&mut self, seed: u64){
+        self.0.initialize_rng(seed);
+    }
+
     #[pyo3(signature=(source_vec_in_tip_frame, target_vec, max_angle, ee_offset_pose, seed_joint_angles, config))]
     fn apply_angle_between_two_vectors_constraint(
-        &self,
+        &mut self,
         source_vec_in_tip_frame: Vec<f64>,
         target_vec: Vec<f64>,
         max_angle: f64,

@@ -51,6 +51,8 @@ class Robot:
         ee_offset_pose: VectorXd | None = ...,
     ) -> tuple[list[float], float] | None: ...
 
+    def initialize_rng(self, seed: int) -> None: ...
+
     def apply_angle_between_two_vectors_constraint(
         self,
         source_vec_in_tip_frame: VectorXd,
