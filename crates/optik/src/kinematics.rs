@@ -25,12 +25,12 @@ impl KinematicChain {
             let base_link_ix = graph
                 .node_indices()
                 .find(|&ix| graph[ix].name == base_link)
-                .unwrap_or_else(|| panic!("base link '{}' does not exist", base_link));
+                .unwrap_or_else(|| panic!("base link '{base_link}' does not exist"));
 
             let ee_link_ix = graph
                 .node_indices()
                 .find(|&ix| graph[ix].name == ee_link)
-                .unwrap_or_else(|| panic!("EE link '{}' does not exist", ee_link));
+                .unwrap_or_else(|| panic!("EE link '{ee_link}' does not exist"));
 
             let (_dist, path) = petgraph::algo::astar(
                 &graph,
@@ -293,7 +293,7 @@ fn parse_urdf(urdf: &urdf_rs::Robot) -> DiGraph<Link, Joint> {
                 Vector3::from_row_slice(&joint.axis.xyz.0),
             )),
             urdf_rs::JointType::Fixed => JointType::Fixed,
-            x => panic!("joint type not supported: {:?}", x),
+            x => panic!("joint type not supported: {x:?}"),
         };
 
         let limits = if joint.limit.upper - joint.limit.lower > 0.0 {
