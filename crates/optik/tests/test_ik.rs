@@ -3,7 +3,7 @@ use std::time::Instant;
 use approx::assert_abs_diff_eq;
 use nalgebra::{DVector, Isometry3, Vector6};
 use optik::{Robot, SolutionMode, SolverConfig};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 const TEST_MODEL_STR: &str = include_str!("data/ur3e.urdf");
 
@@ -48,7 +48,7 @@ fn test_determinism() {
     robot.set_parallelism(1);
 
     let mut rng = StdRng::seed_from_u64(42);
-    let x_target: Vector6<f64> = rng.gen();
+    let x_target: Vector6<f64> = rng.random();
     let tfm_target = robot
         .fk(x_target.as_slice(), &Isometry3::identity())
         .ee_tfm();
@@ -103,7 +103,7 @@ fn test_solution_forward_backward() {
     };
 
     for _ in 0..10 {
-        let x_target: Vector6<f64> = rng.gen();
+        let x_target: Vector6<f64> = rng.random();
         let tfm_target = robot
             .fk(x_target.as_slice(), &Isometry3::identity())
             .ee_tfm();
@@ -148,7 +148,7 @@ fn test_solution_quality() {
 
     for _ in 0..20 {
         let x0 = vec![0.0; robot.num_positions()];
-        let x_target: Vector6<f64> = rng.gen();
+        let x_target: Vector6<f64> = rng.random();
         let tfm_target = robot
             .fk(x_target.as_slice(), &Isometry3::identity())
             .ee_tfm();

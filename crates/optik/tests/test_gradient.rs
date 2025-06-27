@@ -1,10 +1,10 @@
 use approx::assert_abs_diff_eq;
-use nalgebra::{vector, DVector, Isometry3, Vector6};
+use nalgebra::{DVector, Isometry3, Vector6, vector};
 use optik::{
-    objective::{objective, objective_grad},
     Robot,
+    objective::{objective, objective_grad},
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 const TEST_MODEL_STR: &str = include_str!("data/ur3e.urdf");
 
@@ -39,8 +39,8 @@ fn test_gradient_analytical_vs_numerical() {
 
     let mut rng = StdRng::seed_from_u64(42);
     for _ in 0..100 {
-        let x0: Vector6<f64> = rng.gen();
-        let tfm_target = rng.gen();
+        let x0: Vector6<f64> = rng.random();
+        let tfm_target = rng.random();
         let fk = robot.fk(x0.as_slice(), &Isometry3::identity());
 
         // Analytical gradient

@@ -1,8 +1,8 @@
 use std::{
     path::Path,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Instant,
 };
@@ -13,8 +13,8 @@ use ordered_float::OrderedFloat;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rayon::{
-    prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
+    prelude::{IntoParallelIterator, ParallelIterator},
 };
 
 mod config;
@@ -79,7 +79,7 @@ impl Robot {
     pub fn random_configuration(&self, rng: &mut impl rand::Rng) -> Vec<f64> {
         let (lb, ub) = self.joint_limits();
         (0..self.num_positions())
-            .map(|i| rng.gen_range(lb[i]..=ub[i]))
+            .map(|i| rng.random_range(lb[i]..=ub[i]))
             .collect()
     }
 

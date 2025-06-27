@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, c_double, c_uint, c_ulong, CStr},
+    ffi::{CStr, c_char, c_double, c_uint, c_ulong},
     mem,
 };
 
@@ -23,7 +23,7 @@ fn to_str(c_str: *const c_char) -> &'static str {
     unsafe { CStr::from_ptr(c_str).to_str().unwrap() }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_from_urdf_file(
     path: *const c_char,
     base_link: *const c_char,
@@ -36,7 +36,7 @@ extern "C" fn optik_robot_from_urdf_file(
     Box::into_raw(Box::new(Robot::from_urdf_file(path, base_link, ee_link)))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_from_urdf_str(
     urdf: *const c_char,
     base_link: *const c_char,
@@ -49,14 +49,14 @@ extern "C" fn optik_robot_from_urdf_str(
     Box::into_raw(Box::new(Robot::from_urdf_str(urdf, base_link, ee_link)))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_free(robot: *mut Robot) {
     unsafe {
         drop(Box::from_raw(robot));
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_set_parallelism(robot: *mut Robot, n: c_uint) {
     unsafe {
         let robot = robot.as_mut().unwrap();
@@ -64,7 +64,7 @@ extern "C" fn optik_robot_set_parallelism(robot: *mut Robot, n: c_uint) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_num_positions(robot: *const Robot) -> c_uint {
     unsafe {
         let robot = robot.as_ref().unwrap();
@@ -72,7 +72,7 @@ extern "C" fn optik_robot_num_positions(robot: *const Robot) -> c_uint {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_joint_limits(robot: *const Robot) -> *const c_double {
     unsafe {
         let robot = robot.as_ref().unwrap();
@@ -87,7 +87,7 @@ extern "C" fn optik_robot_joint_limits(robot: *const Robot) -> *const c_double {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_joint_jacobian(
     robot: *const Robot,
     x: *const c_double,
@@ -103,7 +103,7 @@ extern "C" fn optik_robot_joint_jacobian(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_fk(robot: *const Robot, x: *const c_double) -> *const c_double {
     unsafe {
         let robot = robot.as_ref().unwrap();
@@ -115,16 +115,16 @@ extern "C" fn optik_robot_fk(robot: *const Robot, x: *const c_double) -> *const 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_random_configuration(robot: *const Robot) -> *const c_double {
     unsafe {
         let robot = robot.as_ref().unwrap();
-        let q = robot.random_configuration(&mut rand::thread_rng());
+        let q = robot.random_configuration(&mut rand::rng());
         q.leak().as_ptr()
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn optik_robot_ik(
     robot: *const Robot,
     config: *const CSolverConfig,

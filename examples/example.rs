@@ -2,7 +2,7 @@ use std::{process, time::Instant};
 
 use nalgebra::Isometry3;
 use optik::*;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();

@@ -9,25 +9,25 @@ members = [
 [workspace.package]
 authors = ["Kyle Cesare <kcesare@gmail.com>"]
 version = "0.5.0-beta.4"
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
-rust-version = "1.80"
+rust-version = "1.85"
 
 [workspace.dependencies]
 optik = { path = "crates/optik" }
 
 # Solver
-nalgebra = "0.33"
+nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "main", features = [ "rand", "serde-serialize" ] }
 nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"
 petgraph = "0.7"
-rand = "0.8"
-rand_chacha = "0.3"
+rand = "0.9"
+rand_chacha = "0.9"
 rayon = "1.10"
 urdf-rs = "0.9"
 
 # Python
-pyo3 = { version = "0.23", features = ["abi3-py38"] }
+pyo3 = { version = "0.25", features = ["abi3-py38"] }
 
 [workspace.lints.rust]
 non_snake_case = "allow"

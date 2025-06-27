@@ -1,6 +1,6 @@
 use nalgebra::{Isometry3, Vector3, Vector6};
 
-use crate::{kinematics::ForwardKinematics, math::se3, Robot};
+use crate::{Robot, kinematics::ForwardKinematics, math::se3};
 
 const IDENTITY_EPS: f64 = 1e-20;
 
