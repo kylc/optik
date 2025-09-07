@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 workspace = true
 
 [build-dependencies]
-pyo3-build-config = "0.25"
+pyo3-build-config = "0.26"
 
 [dependencies]
 nalgebra.workspace = true

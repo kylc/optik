@@ -18,7 +18,7 @@ optik = { path = "crates/optik" }
 
 # Solver
 clarabel = "0.11"
-nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "main", features = [ "rand", "serde-serialize" ] }
+nalgebra = { version = "0.34", features = [ "rand", "serde-serialize" ] }
 nlopt = { git = "https://github.com/kylc/rust-nlopt.git", branch = "optik-patches" }
 ordered-float = "4.2"
 petgraph = "0.7"
