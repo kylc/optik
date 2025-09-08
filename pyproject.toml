@@ -2,7 +2,7 @@
 name = "optik-py"
 description = "An optimizing IK solver based on the Lie group of rigid transforms SE(3)"
 readme = "README.md"
-version = "0.5.0-beta.5"
+version = "0.5.0"
 requires-python = ">=3.8"
 license = "MIT OR Apache-2.0"
 authors = [
